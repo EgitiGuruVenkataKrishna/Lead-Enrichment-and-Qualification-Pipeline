@@ -7,4 +7,3 @@ llama-cpp-python
 beautifulsoup4
 html5lib
 lxml
-libgomp1
