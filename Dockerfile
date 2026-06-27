@@ -13,6 +13,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Failsafe: Hardcode the port if the variable isn't expanding correctly
-# Railway will automatically override the --port flag if it wants to
-CMD python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+# Make the entrypoint script executable
+RUN chmod +x entrypoint.sh
+
+# Launch via the script to guarantee shell expansion
+CMD ["./entrypoint.sh"]
