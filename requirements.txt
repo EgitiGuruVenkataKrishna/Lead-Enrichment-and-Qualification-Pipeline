@@ -4,3 +4,6 @@ sqlalchemy
 requests
 python-multipart
 llama-cpp-python
+beautifulsoup4
+html5lib
+lxml
