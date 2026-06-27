@@ -145,7 +145,7 @@ def score_lead_against_icp(lead_data: dict, icp_config: dict) -> dict:
         return {
             "score": 75,
             "reasoning": "Mock evaluation: Lead matches target size and industry.",
-            "buying_signals": ["Recent website update", "Active hiring"]
+            "buying_signals": ["Recent website update (Source: website_text)", "Active hiring (Source: recent_news)"]
         }
 
     prompt = f"""[INST] You are an expert sales analyst. Evaluate the suitability of the following Lead Data against our Ideal Customer Profile (ICP) Configuration using semantic reasoning, not exact keyword matching.
@@ -164,9 +164,9 @@ Lead Data:
 
 Your response MUST be strictly a single valid JSON object. Do not include any explanations, preamble, or markdown formatting outside of the JSON itself.
 The JSON object MUST contain exactly the following keys:
-- "score": An integer from 0 to 100 representing how well the lead matches the ICP.
+- "icp_fit_score": An integer from 0 to 100 representing how well the lead matches the ICP.
 - "reasoning": A detailed string justification of the score based on semantic matching.
-- "buying_signals": A list of strings detailing any detected buying signals.
+- "buying_signals": A list of strings detailing any detected buying signals. You MUST explicitly state the source of each signal from the data (e.g. 'Raised $10M (Source: recent_news field)' or 'Active hiring (Source: website_text)').
 
 JSON Output:
 [/INST]"""
@@ -181,14 +181,38 @@ JSON Output:
         result = clean_llm_json(raw_output)
         
         # Ensure default structure is returned if keys are missing
-        if not isinstance(result, dict) or "score" not in result or "reasoning" not in result or "buying_signals" not in result:
+        if not isinstance(result, dict) or "icp_fit_score" not in result or "reasoning" not in result or "buying_signals" not in result:
             return {
                 "score": 0,
                 "reasoning": "Failed to extract valid ICP score structure from LLM output",
                 "buying_signals": []
             }
             
-        return result
+        icp_fit_score = result.get("icp_fit_score", 0)
+        buying_signals = result.get("buying_signals", [])
+        
+        # Get weights from env
+        icp_weight_str = os.getenv("ICP_FIT_WEIGHT", "0.7")
+        signal_weight_str = os.getenv("BUYING_SIGNAL_WEIGHT", "0.3")
+        try:
+            icp_weight = float(icp_weight_str)
+        except ValueError:
+            icp_weight = 0.7
+        try:
+            signal_weight = float(signal_weight_str)
+        except ValueError:
+            signal_weight = 0.3
+            
+        # Calculate derived score
+        signal_strength_score = min(len(buying_signals) * 33, 100)
+        final_score = int((icp_fit_score * icp_weight) + (signal_strength_score * signal_weight))
+        final_score = min(max(final_score, 0), 100)
+        
+        return {
+            "score": final_score,
+            "reasoning": result.get("reasoning", ""),
+            "buying_signals": buying_signals
+        }
     except Exception as e:
         print(f"Error during ICP scoring LLM execution: {e}")
         return {
