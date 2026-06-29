@@ -41,21 +41,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
                 
                 // Find Company
-                const headerSection = document.querySelector('.mt2.relative') || document.querySelector('.ph5.pb5') || topCard;
-                
-                // Method 1: Explicit links (when viewing others' profiles)
-                const links = headerSection.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
-                for (let link of links) {
-                    let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
-                    if (text && text.length > 2 && text !== name && text !== title) {
-                        company = text;
-                        break;
+                // Method 1: Target right panel directly (handles both your own profile and others)
+                const rightPanel = topCard.querySelector('.pv-text-details__right-panel');
+                if (rightPanel) {
+                    const elements = rightPanel.querySelectorAll('button, a');
+                    for (let el of elements) {
+                        let text = el.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
+                        if (text && text.length > 2 && text !== name && text !== title) {
+                            company = text;
+                            break;
+                        }
                     }
                 }
                 
-                // Method 2: Edit buttons (when viewing your own profile)
+                // Method 2: Fallback to explicit links anywhere in the top card
                 if (!company) {
-                    const buttons = headerSection.querySelectorAll('button[aria-label*="education" i], button[aria-label*="company" i]');
+                    const links = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+                    for (let link of links) {
+                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
+                        if (text && text.length > 2 && text !== name && text !== title) {
+                            company = text;
+                            break;
+                        }
+                    }
+                }
+                
+                // Method 3: Fallback to buttons with aria-label in the top card (for your own profile)
+                if (!company) {
+                    const buttons = topCard.querySelectorAll('button[aria-label*="company" i], button[aria-label*="education" i]');
                     for (let btn of buttons) {
                         let text = btn.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
                         if (text && text.length > 2 && text !== name && text !== title) {
