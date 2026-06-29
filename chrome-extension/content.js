@@ -40,9 +40,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
                 
-                // Find Company (via explicit links to company/school pages in the top card)
-                // This completely bypasses class-name obfuscation
-                const companyLinks = topCard ? topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]') : [];
+                // Find Company (via right panel explicit links to company/school pages)
+                // This completely bypasses class-name obfuscation and avoids the "Highlights" section
+                const rightPanel = topCard ? topCard.querySelector('.pv-text-details__right-panel') : null;
+                const companyLinks = rightPanel ? rightPanel.querySelectorAll('a[href*="/company/"], a[href*="/school/"], button') : [];
                 for (let link of companyLinks) {
                     let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
                     // Make sure it's not empty and not just an icon label
