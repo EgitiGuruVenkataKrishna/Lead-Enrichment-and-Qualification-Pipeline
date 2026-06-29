@@ -48,14 +48,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     if (parts.length >= 2) title = parts[1].trim();
                 }
                 
-                // 2.5 Define the Top Card (The section containing the name)
-                // This guarantees we NEVER scrape the Highlights or Experience sections by mistake!
-                let topCard = document.querySelector('.pv-top-card');
+                // 2.5 Define the Top Card safely
+                // This guarantees we NEVER scrape the Highlights or sidebar by mistake!
+                let topCard = document.querySelector('.pv-top-card') || document.querySelector('.ph5.pb5');
                 if (!topCard) {
                     const h1 = document.querySelector('h1');
-                    if (h1) topCard = h1.closest('section');
+                    if (h1) topCard = h1.closest('section') || h1.parentElement.parentElement.parentElement;
                 }
-                if (!topCard) topCard = document.body;
+                // If we absolutely cannot find the top card wrapper, we create a dummy element to prevent global scraping
+                if (!topCard) topCard = document.createElement('div');
 
                 // 3. Company Extraction (Optimized for modern UI cards)
                 // Strategy: Only look strictly inside the topCard for links to companies/schools, or edit buttons.
@@ -70,9 +71,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
 
                 // Fallback 1: Extract from Title string text splitting 
-                if (!company && title && title.toLowerCase().includes(' at ')) {
-                    const parts = title.split(/\sat\s/i);
-                    company = parts[parts.length - 1].trim();
+                if (!company && title) {
+                    if (title.toLowerCase().includes(' at ')) {
+                        const parts = title.split(/\sat\s/i);
+                        company = parts[parts.length - 1].trim();
+                    } else if (title.includes(' - ')) {
+                        const parts = title.split(' - ');
+                        if (parts.length > 1) {
+                            company = parts[1].split(',')[0].trim();
+                        }
+                    }
                 }
                 
                 // Fallback 2: The Right Panel if no explicit links exist (Handles search URLs or unusual badges)
