@@ -48,9 +48,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     if (parts.length >= 2) title = parts[1].trim();
                 }
                 
-                // 2.5 Define the Top Card (First section in the main layout)
+                // 2.5 Define the Top Card (The section containing the name)
                 // This guarantees we NEVER scrape the Highlights or Experience sections by mistake!
-                const topCard = document.querySelector('main section') || document.body;
+                let topCard = document.querySelector('.pv-top-card');
+                if (!topCard) {
+                    const h1 = document.querySelector('h1');
+                    if (h1) topCard = h1.closest('section');
+                }
+                if (!topCard) topCard = document.body;
 
                 // 3. Company Extraction (Optimized for modern UI cards)
                 // Strategy: Only look strictly inside the topCard for links to companies/schools, or edit buttons.
@@ -70,16 +75,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     company = parts[parts.length - 1].trim();
                 }
                 
-                // Fallback 2: The Right Panel if no explicit links exist
+                // Fallback 2: The Right Panel if no explicit links exist (Handles search URLs or unusual badges)
                 if (!company) {
                     const rightPanel = topCard.querySelector('.pv-text-details__right-panel');
                     if (rightPanel) {
-                        const items = rightPanel.querySelectorAll('li');
+                        const items = rightPanel.querySelectorAll('li, button, a');
                         for (let item of items) {
                             let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
                             if (text && text.length > 2 && text !== name && text !== title) {
                                 company = text;
                                 break;
+                            }
+                        }
+                        
+                        // Ultimate fallback: Just grab the raw visible text of the right panel
+                        if (!company && rightPanel.innerText) {
+                            let text = rightPanel.innerText.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                            if (text && text.length > 2 && text !== name && text !== title) {
+                                company = text;
                             }
                         }
                     }
