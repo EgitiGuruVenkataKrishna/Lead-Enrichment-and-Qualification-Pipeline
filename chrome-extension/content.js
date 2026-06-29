@@ -3,7 +3,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "scrape") {
         const url = window.location.href;
         
-        if (url.includes('://linkedin.com')) {
+        if (url.includes('linkedin.com/in/')) {
             const extractProfile = () => {
                 let name = "", title = "", company = "", location = "";
                 
