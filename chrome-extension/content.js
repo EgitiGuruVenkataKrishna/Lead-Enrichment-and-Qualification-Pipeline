@@ -23,7 +23,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     else name = docTitle.trim();
                 }
                 
-                // 2. Parse Title & Company
+                // 2. Parse Title
                 let docTitle = document.title.replace(' | LinkedIn', '');
                 let parts = docTitle.split(' - ');
                 
@@ -39,26 +39,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         title = lines[nameIdx + 1];
                     }
                 }
+
+                // 3. Parse Company
+                // PRIORITY 1: The Right Panel of the Top Card (Most accurate, exactly matches UI)
+                const rightPanel = document.querySelector('.pv-top-card .pv-text-details__right-panel') || document.querySelector('section.artdeco-card .pv-text-details__right-panel');
+                if (rightPanel) {
+                    const companyLinks = rightPanel.querySelectorAll('a[href*="/company/"], a[href*="/school/"], button');
+                    for (let link of companyLinks) {
+                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                        if (text && text.length > 2 && text !== name && text !== title && !text.includes("You both")) {
+                            company = text;
+                            break;
+                        }
+                    }
+                }
                 
-                // Get Company from document.title (Part 3)
-                if (parts.length >= 3) {
+                // PRIORITY 2: Document Title
+                if (!company && parts.length >= 3) {
                     company = parts[2].trim();
                 }
                 
-                // Fallback 1: Extract from "at" in title
-                if (!company && title.toLowerCase().includes(' at ')) {
-                    company = title.split(/\sat\s/i)[1].trim();
+                // PRIORITY 3: Extract from "at" or "@" in title
+                if (!company) {
+                    let lowerTitle = title.toLowerCase();
+                    if (lowerTitle.includes(' at ')) {
+                        company = title.split(/\sat\s/i)[1].trim();
+                    } else if (lowerTitle.includes('@')) {
+                        company = title.split(/@/)[1].trim();
+                        if (company.includes('|')) company = company.split('|')[0].trim();
+                    }
                 }
                 
-                // Fallback 2: Look in Experience section
+                // PRIORITY 4: Look in Experience section
                 if (!company) {
                     const expSection = document.querySelector('#experience')?.closest('section');
                     if (expSection) {
                         const spans = expSection.querySelectorAll('span[aria-hidden="true"]');
-                        // The actual company name is usually the second or first span
                         for (let span of spans) {
                             let text = span.textContent.trim();
-                            if (text && text.length > 2 && text !== title && text !== name) {
+                            if (text && text.length > 2 && text !== title && text !== name && !text.includes(" mos") && !text.includes(" yrs")) {
                                 company = text;
                                 break;
                             }
@@ -66,7 +85,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
                 
-                // Fallback 3: Look in Education section
+                // PRIORITY 5: Look in Education section
                 if (!company) {
                     const eduSection = document.querySelector('#education')?.closest('section');
                     if (eduSection) {
@@ -77,19 +96,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 company = text;
                                 break;
                             }
-                        }
-                    }
-                }
-                
-                // Fallback 4: Look for explicit company links in the top card, filtering out highlights
-                if (!company) {
-                    const topCard = document.querySelector('section.artdeco-card') || document.body;
-                    const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
-                    for (let link of companyLinks) {
-                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                        if (text && text.length > 2 && text !== name && text !== title && !text.includes("You both")) {
-                            company = text;
-                            break;
                         }
                     }
                 }
