@@ -23,53 +23,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     else name = docTitle.trim();
                 }
                 
-                // 2. Parse Top Card
-                const topCard = document.querySelector('.pv-top-card') || document.querySelector('main section.artdeco-card') || document.querySelector('main section');
+                // 2. Parse Title & Company
+                let docTitle = document.title.replace(' | LinkedIn', '');
+                let parts = docTitle.split(' - ');
                 
-                // Find Headline (Title)
-                const lines = topCard ? topCard.textContent.split('\n').map(s=>s.trim()).filter(s=>s.length > 0) : [];
-                const nameIdx = lines.findIndex(l => l.includes(name));
-                if (nameIdx !== -1) {
-                    for (let i = nameIdx + 1; i < nameIdx + 4 && i < lines.length; i++) {
-                        let line = lines[i];
-                        if (line.match(/^\(.*\)$/)) continue; // skip (He/Him)
-                        if (!title) {
-                            title = line;
-                            break;
-                        }
+                // Get Title from document title if available
+                if (parts.length >= 2) {
+                    title = parts[1].trim();
+                } else {
+                    // Fallback to top card text if document.title is weird
+                    const topCard = document.querySelector('section.artdeco-card') || document.body;
+                    const lines = topCard.textContent.split('\n').map(s=>s.trim()).filter(s=>s.length > 0);
+                    const nameIdx = lines.findIndex(l => l.includes(name));
+                    if (nameIdx !== -1 && lines.length > nameIdx + 1) {
+                        title = lines[nameIdx + 1];
                     }
                 }
                 
-                // Find Company (via right panel explicit links to company/school pages)
-                // This completely bypasses class-name obfuscation and avoids the "Highlights" section
-                const rightPanel = topCard ? topCard.querySelector('.pv-text-details__right-panel') : null;
-                const companyLinks = rightPanel ? rightPanel.querySelectorAll('a[href*="/company/"], a[href*="/school/"], button') : [];
-                for (let link of companyLinks) {
-                    let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                    // Make sure it's not empty and not just an icon label
-                    if (text && text.length > 2 && text !== name && text !== title) {
-                        company = text;
-                        break;
-                    }
+                // Get Company from document.title (Part 3)
+                if (parts.length >= 3) {
+                    company = parts[2].trim();
                 }
                 
-                // Fallbacks
-                if (!title) {
-                    let docTitle = document.title.replace(' | LinkedIn', '');
-                    let parts = docTitle.split(' - ');
-                    if (parts.length >= 2) title = parts[1].trim();
-                }
-                
+                // Fallback 1: Extract from "at" in title
                 if (!company && title.toLowerCase().includes(' at ')) {
                     company = title.split(/\sat\s/i)[1].trim();
                 }
                 
+                // Fallback 2: Look in Experience section
                 if (!company) {
                     const expSection = document.querySelector('#experience')?.closest('section');
                     if (expSection) {
                         const spans = expSection.querySelectorAll('span[aria-hidden="true"]');
-                        if (spans.length >= 2) company = spans[1].textContent.trim();
-                        else if (spans.length >= 1) company = spans[0].textContent.trim();
+                        // The actual company name is usually the second or first span
+                        for (let span of spans) {
+                            let text = span.textContent.trim();
+                            if (text && text.length > 2 && text !== title && text !== name) {
+                                company = text;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Fallback 3: Look in Education section
+                if (!company) {
+                    const eduSection = document.querySelector('#education')?.closest('section');
+                    if (eduSection) {
+                        const spans = eduSection.querySelectorAll('span[aria-hidden="true"]');
+                        for (let span of spans) {
+                            let text = span.textContent.trim();
+                            if (text && text.length > 2 && text !== title && text !== name) {
+                                company = text;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Fallback 4: Look for explicit company links in the top card, filtering out highlights
+                if (!company) {
+                    const topCard = document.querySelector('section.artdeco-card') || document.body;
+                    const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+                    for (let link of companyLinks) {
+                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                        if (text && text.length > 2 && text !== name && text !== title && !text.includes("You both")) {
+                            company = text;
+                            break;
+                        }
                     }
                 }
 
