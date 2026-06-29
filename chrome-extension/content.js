@@ -41,19 +41,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
                 
                 // Find Company
-                // Method 1: Right-panel badges (most reliable for current status)
-                const rightItems = topCard.querySelectorAll('.pv-text-details__right-panel li button, .pv-text-details__right-panel li a');
-                for (let item of rightItems) {
-                    let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                    if (text && text.length > 2 && text !== name && text !== title) {
-                        company = text;
-                        break;
+                // Method 1: The UL inside the top card (contains badges)
+                const headerSection = document.querySelector('.mt2.relative') || document.querySelector('.ph5.pb5') || topCard;
+                if (headerSection) {
+                    const rightList = headerSection.querySelector('ul');
+                    if (rightList) {
+                        const items = rightList.querySelectorAll('li');
+                        for (let item of items) {
+                            let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                            if (text && text.length > 2 && text !== name && text !== title) {
+                                company = text;
+                                break;
+                            }
+                        }
                     }
                 }
                 
-                // Method 2: Explicit links (if right panel empty)
+                // Method 2: Explicit links in the top card if UL failed
                 if (!company) {
-                    const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+                    const companyLinks = headerSection.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
                     for (let link of companyLinks) {
                         let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
                         if (text && text.length > 2 && text !== name && text !== title) {
