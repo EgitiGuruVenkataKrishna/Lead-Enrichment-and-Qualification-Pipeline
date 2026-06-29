@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Enrichment & Qualification Pipeline</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-bolt text-primary"></i>
+                <h2>LeadQ</h2>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active" data-target="dashboard-view">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-target="upload-view">
+                    <i class="fa-solid fa-file-csv"></i> Upload CSV
+                </a>
+                <a href="#" class="nav-item" data-target="icp-view">
+                    <i class="fa-solid fa-bullseye"></i> ICP Config
+                </a>
+                <a href="#" class="nav-item" data-target="status-view">
+                    <i class="fa-solid fa-spinner"></i> Pipeline Status
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="view-section active">
+                <header class="section-header">
+                    <h1>Leads Dashboard</h1>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="switchView('upload-view')">
+                            <i class="fa-solid fa-plus"></i> New Leads
+                        </button>
+                    </div>
+                </header>
+                <div class="table-container">
+                    <table id="leads-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Company</th>
+                                <th>ICP Score</th>
+                                <th>Top Signal</th>
+                                <th>Status</th>
+                                <th>CRM Sync</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Lead Detail View -->
+            <section id="detail-view" class="view-section hidden">
+                <header class="section-header">
+                    <div>
+                        <button class="btn btn-secondary back-btn" onclick="switchView('dashboard-view')">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </button>
+                        <h1 id="detail-name">Lead Detail</h1>
+                    </div>
+                    <span id="detail-status" class="badge"></span>
+                </header>
+                <div class="detail-grid">
+                    <div class="card profile-card">
+                        <h3>Profile</h3>
+                        <div id="detail-profile"></div>
+                    </div>
+                    <div class="card icp-card">
+                        <h3>ICP Score & Signals</h3>
+                        <div class="score-display">
+                            <div class="score-circle">
+                                <span id="detail-score">0</span>
+                            </div>
+                        </div>
+                        <h4>Buying Signals</h4>
+                        <ul id="detail-signals" class="signals-list"></ul>
+                        <h4>Reasoning</h4>
+                        <p id="detail-reasoning" class="text-muted"></p>
+                    </div>
+                    <div class="card drafts-card">
+                        <h3>Outreach Drafts</h3>
+                        <div id="detail-drafts">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Upload View -->
+            <section id="upload-view" class="view-section hidden">
+                <header class="section-header">
+                    <h1>Upload Leads (CSV)</h1>
+                </header>
+                <div class="card upload-card">
+                    <div class="upload-zone" id="drop-zone">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>Drag & drop your CSV file here or click to browse.</p>
+                        <input type="file" id="csv-file-input" accept=".csv" hidden>
+                        <button class="btn btn-secondary" onclick="document.getElementById('csv-file-input').click()">Browse Files</button>
+                    </div>
+                    <div id="csv-preview-container" class="hidden mt-4">
+                        <h3>Preview (First 5 Rows)</h3>
+                        <table id="csv-preview-table" class="preview-table"></table>
+                        <div class="mt-4 flex-end">
+                            <button class="btn btn-primary" id="btn-upload">Upload & Start Enrichment</button>
+                        </div>
+                    </div>
+                    <div id="upload-error" class="error-text hidden mt-2"></div>
+                </div>
+            </section>
+
+            <!-- ICP Config View -->
+            <section id="icp-view" class="view-section hidden">
+                <header class="section-header">
+                    <h1>Ideal Customer Profile (ICP)</h1>
+                </header>
+                <div class="grid-2">
+                    <div class="card">
+                        <form id="icp-form">
+                            <div class="form-group">
+                                <label>Target Company Size</label>
+                                <input type="text" id="icp-size" placeholder="e.g. 50-200 employees">
+                            </div>
+                            <div class="form-group">
+                                <label>Target Industries</label>
+                                <input type="text" id="icp-industries" placeholder="e.g. B2B SaaS, Fintech">
+                            </div>
+                            <div class="form-group">
+                                <label>Required Tech Stack</label>
+                                <input type="text" id="icp-tech" placeholder="e.g. React, AWS">
+                            </div>
+                            <div class="form-group">
+                                <label>Minimum Seniority</label>
+                                <input type="text" id="icp-seniority" placeholder="e.g. VP or C-Level">
+                            </div>
+                            <div class="form-group">
+                                <label>Disqualifying Signals</label>
+                                <input type="text" id="icp-disqualify" placeholder="e.g. Agencies, Competitors">
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-2">Save Configuration</button>
+                        </form>
+                    </div>
+                    <div class="card preview-card">
+                        <h3>Score Preview</h3>
+                        <p class="text-muted">Test how the current configuration scores a sample lead (Jane Doe, CTO at TechStart Inc, 50 employees, React/Python/AWS).</p>
+                        <button class="btn btn-secondary mt-2" id="btn-preview-score">Run Preview</button>
+                        <div id="preview-result" class="hidden mt-4">
+                            <div class="score-row">
+                                <strong>Score:</strong> <span id="preview-score-val"></span>
+                            </div>
+                            <div class="score-row">
+                                <strong>Reasoning:</strong>
+                                <p id="preview-reasoning" class="text-muted"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pipeline Status View -->
+            <section id="status-view" class="view-section hidden">
+                <header class="section-header">
+                    <h1>Pipeline Status</h1>
+                    <button class="btn btn-icon" onclick="fetchPipelineStatus()"><i class="fa-solid fa-rotate-right"></i></button>
+                </header>
+                <div class="card">
+                    <ul id="status-list" class="status-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                    <div id="no-active-jobs" class="empty-state hidden">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <p>All leads have been processed. No active jobs.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

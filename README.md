@@ -37,12 +37,10 @@ The pipeline avoids unstable, expensive APIs in favor of direct DOM-based scrapi
 
 ## 5. Deployment Instructions (Railway)
 
-This repository is tailored for easy deployment on [Railway](https://railway.app/).
+This repository is tailored for easy deployment on [Railway](https://railway.app/) using Docker.
 
 1. **Prepare the Repository**: Ensure your code is pushed to a GitHub repository.
-2. **Model Hosting**: Railway's ephemeral file system will not persist the `model.gguf` file across builds if it's large. For a production deployment, either:
-   - Mount a Railway Persistent Volume to `/app` and place `model.gguf` inside.
-   - Modify the `Dockerfile` to `wget` or `curl` the `.gguf` file from an AWS S3 bucket or HuggingFace during the build step.
+2. **Model Hosting**: The `Dockerfile` has been configured to automatically download a lightweight micro-model (`Qwen1.5-0.5B-Chat-GGUF`, ~398MB) during the build step. This completely avoids the need to mount volumes or upload 4GB files, and fits safely within Railway's 500MB Hobby tier limits.
 3. **Connect to Railway**:
    - Go to the Railway dashboard, select **New Project** > **Deploy from GitHub repo**.
    - Select your lead-enrichment repository.
@@ -56,4 +54,9 @@ This repository is tailored for easy deployment on [Railway](https://railway.app
    ICP_FIT_WEIGHT=0.7
    BUYING_SIGNAL_WEIGHT=0.3
    ```
-5. **Build and Deploy**: Railway will automatically detect the `Dockerfile` (or `Procfile`) and begin the build. Wait for the green "Active" status. Your FastAPI endpoints are now live.
+5. **Build and Deploy**: Railway will automatically detect the `Dockerfile` and begin the build. The frontend will be served directly from the root `/` endpoint, and the APIs from `/api`.
+
+## 6. UI & Chrome Extension
+
+- **Web Dashboard**: Accessible at the root URL. Built with Vanilla JS and CSS for maximum performance and easy maintenance. Features live polling for pipeline status, a sortable lead table, CSV upload preview, and detailed breakdown of outreach drafts and buying signals.
+- **Chrome Extension**: Can be loaded in Developer Mode by pointing to the `chrome-extension/` directory. It communicates seamlessly with the deployed backend to enrich leads in real-time straight from LinkedIn profiles and Company Websites, displaying spinners and final score summaries directly in the popup.

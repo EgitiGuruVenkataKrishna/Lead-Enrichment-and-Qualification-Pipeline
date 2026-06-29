@@ -2,6 +2,12 @@ import csv
 from typing import Generator
 from fastapi import FastAPI, UploadFile, File, Depends, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from pydantic import ValidationError
@@ -51,7 +57,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/api/health")
 async def root():
     return {"status": "ok", "message": "Pipeline Online"}
 
@@ -173,3 +179,53 @@ async def get_lead(lead_id: int, db: Session = Depends(get_db)):
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     return lead
+
+@app.get("/api/leads", response_model=list[schemas.LeadResponse])
+async def get_all_leads(db: Session = Depends(get_db)):
+    leads = db.query(models.Lead).order_by(models.Lead.id.desc()).all()
+    return leads
+
+@app.get("/api/status", response_model=list[schemas.PipelineStatusResponse])
+async def get_pipeline_status(db: Session = Depends(get_db)):
+    leads = db.query(models.Lead).filter(models.Lead.pipeline_status == "enriching").all()
+    return [{"lead_id": l.id, "original_name": l.original_name, "original_company": l.original_company, "pipeline_status": l.pipeline_status} for l in leads]
+
+@app.get("/api/icp", response_model=schemas.ICPConfigResponse)
+async def get_icp_config(db: Session = Depends(get_db)):
+    config = db.query(models.ICPConfig).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="ICP Config not found")
+    return config
+
+@app.post("/api/icp", response_model=schemas.ICPConfigResponse)
+async def update_icp_config(icp_in: schemas.ICPConfigCreate, db: Session = Depends(get_db)):
+    config = db.query(models.ICPConfig).first()
+    if not config:
+        config = models.ICPConfig(**icp_in.model_dump())
+        db.add(config)
+    else:
+        for k, v in icp_in.model_dump(exclude_unset=True).items():
+            setattr(config, k, v)
+    db.commit()
+    db.refresh(config)
+    return config
+
+@app.post("/api/icp/preview")
+async def preview_icp_score(icp_in: schemas.ICPConfigCreate):
+    import llm_service
+    sample_lead = {
+        "original_name": "Jane Doe",
+        "original_company": "TechStart Inc",
+        "company_size": "50 employees",
+        "tech_stack": "React, Python, AWS",
+        "industry": "Software",
+        "role": "CTO",
+        "seniority": "C-Level"
+    }
+    result = llm_service.score_lead_against_icp(sample_lead, icp_in.model_dump())
+    return result
+
+# Create frontend directory if it doesn't exist
+os.makedirs("frontend", exist_ok=True)
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+

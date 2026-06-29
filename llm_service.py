@@ -1,8 +1,12 @@
 import os
 import json
 import re
-
 import traceback
+import schemas
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Conditional import of llama_cpp to support mock mode when not installed
 try:
@@ -133,7 +137,16 @@ JSON Output:
             temperature=0.1
         )
         raw_output = response["choices"][0]["text"]
-        return clean_llm_json(raw_output)
+        json_data = clean_llm_json(raw_output)
+        
+        # Validate against schema
+        try:
+            validated = schemas.EnrichedProfileOutput(**json_data)
+            return validated.model_dump()
+        except Exception as ve:
+            print(f"Validation error on LLM extraction output: {ve}")
+            return json_data # Fallback to raw if validation strictly fails (or could return {})
+            
     except Exception as e:
         print(f"Error during LLM extraction: {e}")
         return {}
@@ -221,7 +234,7 @@ JSON Output:
             "buying_signals": []
         }
 
-def generate_outreach_drafts(lead_data: dict, product_value_prop: str) -> dict:
+def generate_outreach_drafts(lead_data: dict, product_value_prop: str, num_variants: int = 3) -> dict:
     llm_inst = get_llm_instance()
     if llm_inst is None:
         # Return mock drafts if LLM is disabled/unavailable
@@ -230,13 +243,14 @@ def generate_outreach_drafts(lead_data: dict, product_value_prop: str) -> dict:
         role = lead_data.get("role") or "your role"
         return {
             "direct": f"Hi {name},\n\nI saw your work at {company} as a {role}. Let's connect to talk about {product_value_prop}.",
-            "consultative": f"Hello {name},\n\nHope this finds you well. As a {role} at {company}, you're likely managing dynamic challenges. Let's discuss how {product_value_prop} can support your goals."
+            "consultative": f"Hello {name},\n\nHope this finds you well. As a {role} at {company}, you're likely managing dynamic challenges. Let's discuss how {product_value_prop} can support your goals.",
+            "social_proof": f"Hi {name},\n\nWe helped similar teams improve. Let's discuss how {product_value_prop} can help {company}."
         }
 
     if lead_data.get("icp_score", 0) < 50:
-        return {"direct": "", "consultative": ""}
+        return {"direct": "", "consultative": "", "social_proof": ""}
 
-    prompt = f"""[INST] You are an expert copywriter. Generate two personalized sales outreach emails to the lead based on their profile data and our product's value proposition.
+    prompt = f"""[INST] You are an expert copywriter. Generate personalized sales outreach emails to the lead based on their profile data and our product's value proposition.
 
 Product Value Proposition:
 {product_value_prop}
@@ -246,22 +260,29 @@ Lead Data:
 
 CRITICAL INSTRUCTION: Generic drafts are a failure mode. You MUST explicitly reference specific facts from the lead's profile, such as their recent news, funding, specific tech stack, or buying signals. Do not use generic placeholders where real facts are available.
 
-Generate exactly two email variants:
+Generate exactly {num_variants} email variants:
 1. "direct": Short, punchy, gets straight to the point.
-2. "consultative": Focuses on problem-solving, slightly longer, references deeper context.
+2. "consultative": Focuses on problem-solving, slightly longer, references deeper context."""
+
+    if num_variants == 3:
+        prompt += '\n3. "social_proof": Highlights social proof and similar companies.'
+
+    prompt += f"""
 
 Your response MUST be strictly a single valid JSON object. Do not include any explanations, preamble, or markdown formatting outside of the JSON itself.
 The JSON object MUST contain exactly the following keys:
 - "direct": The text of the direct email variant.
-- "consultative": The text of the consultative email variant.
+- "consultative": The text of the consultative email variant."""
+    
+    if num_variants == 3:
+        prompt += '\n- "social_proof": The text of the social proof email variant.'
 
-JSON Output:
-[/INST]"""
+    prompt += "\n\nJSON Output:\n[/INST]"
 
     try:
         response = llm_inst(
             prompt,
-            max_tokens=800,
+            max_tokens=1000,
             temperature=0.4
         )
         raw_output = response["choices"][0]["text"]
@@ -269,9 +290,9 @@ JSON Output:
         
         # Ensure correct structure is returned
         if not isinstance(result, dict) or "direct" not in result or "consultative" not in result:
-            return {"direct": "", "consultative": ""}
+            return {"direct": "", "consultative": "", "social_proof": ""}
             
         return result
     except Exception as e:
         print(f"Error during outreach generation LLM execution: {e}")
-        return {"direct": "", "consultative": ""}
+        return {"direct": "", "consultative": "", "social_proof": ""}

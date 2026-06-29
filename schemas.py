@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from pydantic import BaseModel, model_validator, ConfigDict, Field
 
 class LeadCreate(BaseModel):
@@ -68,3 +68,36 @@ class ICPScoreResult(BaseModel):
     score: int = Field(..., ge=0, le=100)
     reasoning: str
     buying_signals: List[str]
+
+class ConfidenceScores(BaseModel):
+    company_size: Literal["high", "medium", "low"]
+    tech_stack: Literal["high", "medium", "low"]
+    funding_status: Literal["high", "medium", "low"]
+    industry: Literal["high", "medium", "low"]
+    sub_industry: Literal["high", "medium", "low"]
+    role: Literal["high", "medium", "low"]
+    seniority: Literal["high", "medium", "low"]
+    recent_news: Literal["high", "medium", "low"]
+
+class EnrichedProfileOutput(BaseModel):
+    company_size: Optional[str] = None
+    tech_stack: Optional[str] = None
+    funding_status: Optional[str] = None
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    role: Optional[str] = None
+    seniority: Optional[str] = None
+    recent_news: Optional[str] = None
+    confidence_scores: ConfidenceScores
+
+class OutreachDrafts(BaseModel):
+    direct: str
+    consultative: str
+    social_proof: Optional[str] = None
+
+class PipelineStatusResponse(BaseModel):
+    lead_id: int
+    original_name: Optional[str] = None
+    original_company: Optional[str] = None
+    pipeline_status: str
+
