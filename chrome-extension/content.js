@@ -40,15 +40,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
                 
-                // Find Company (via explicit links to company/school pages in the top card)
-                // This completely bypasses class-name obfuscation
-                const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"], button[aria-label*="company"], button[aria-label*="Education"]');
-                for (let link of companyLinks) {
-                    let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                    // Make sure it's not empty and not just an icon label
+                // Find Company
+                // Method 1: Right-panel badges (most reliable for current status)
+                const rightItems = topCard.querySelectorAll('.pv-text-details__right-panel li button, .pv-text-details__right-panel li a');
+                for (let item of rightItems) {
+                    let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
                     if (text && text.length > 2 && text !== name && text !== title) {
                         company = text;
                         break;
+                    }
+                }
+                
+                // Method 2: Explicit links (if right panel empty)
+                if (!company) {
+                    const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+                    for (let link of companyLinks) {
+                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                        if (text && text.length > 2 && text !== name && text !== title) {
+                            company = text;
+                            break;
+                        }
                     }
                 }
                 
