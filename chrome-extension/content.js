@@ -41,27 +41,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
                 
                 // Find Company
-                // Method 1: The UL inside the top card (contains badges)
                 const headerSection = document.querySelector('.mt2.relative') || document.querySelector('.ph5.pb5') || topCard;
-                if (headerSection) {
-                    const rightList = headerSection.querySelector('ul');
-                    if (rightList) {
-                        const items = rightList.querySelectorAll('li');
-                        for (let item of items) {
-                            let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                            if (text && text.length > 2 && text !== name && text !== title) {
-                                company = text;
-                                break;
-                            }
-                        }
+                
+                // Method 1: Explicit links (when viewing others' profiles)
+                const links = headerSection.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+                for (let link of links) {
+                    let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
+                    if (text && text.length > 2 && text !== name && text !== title) {
+                        company = text;
+                        break;
                     }
                 }
                 
-                // Method 2: Explicit links in the top card if UL failed
+                // Method 2: Edit buttons (when viewing your own profile)
                 if (!company) {
-                    const companyLinks = headerSection.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
-                    for (let link of companyLinks) {
-                        let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                    const buttons = headerSection.querySelectorAll('button[aria-label*="education" i], button[aria-label*="company" i]');
+                    for (let btn of buttons) {
+                        let text = btn.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
                         if (text && text.length > 2 && text !== name && text !== title) {
                             company = text;
                             break;
