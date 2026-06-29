@@ -7,13 +7,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const extractProfile = () => {
                 let name = "", title = "", company = "", location = "";
                 
-                // 1. Name Extraction
-                const nameSelectors = [
-                    'h1.text-heading-xlarge', 
-                    '.pv-text-details__left-panel h1', 
-                    '.top-card-layout__title'
-                ];
-                for (let sel of nameSelectors) {
+                // 1. Name
+                const selectors = ['h1.text-heading-xlarge', '.text-heading-xlarge', '.top-card-layout__title', 'h1'];
+                for (let sel of selectors) {
                     const el = document.querySelector(sel);
                     if (el && el.textContent.trim().length > 0) {
                         name = el.textContent.trim().split('\n')[0];
@@ -21,104 +17,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
                 
-                // Fallback to Document Title for Name
                 if (!name) {
                     let docTitle = document.title.replace(' | LinkedIn', '');
-                    name = docTitle.includes(' - ') ? docTitle.split(' - ')[0].trim() : docTitle.trim();
+                    if (docTitle.includes(' - ')) name = docTitle.split(' - ')[0].trim();
+                    else name = docTitle.trim();
                 }
                 
-                // 2. Headline / Title Extraction
-                const titleSelectors = [
-                    'div.text-body-medium.break-words', 
-                    '.pv-text-details__left-panel .text-body-medium',
-                    '.top-card-layout__headline'
-                ];
-                for (let sel of titleSelectors) {
-                    const el = document.querySelector(sel);
-                    if (el && el.textContent.trim().length > 0) {
-                        title = el.textContent.trim();
+                // 2. Parse Top Card
+                const topCard = document.querySelector('.pv-top-card') || document.querySelector('main section.artdeco-card') || document.querySelector('main section');
+                
+                // Find Headline (Title)
+                const lines = topCard ? topCard.textContent.split('\n').map(s=>s.trim()).filter(s=>s.length > 0) : [];
+                const nameIdx = lines.findIndex(l => l.includes(name));
+                if (nameIdx !== -1) {
+                    for (let i = nameIdx + 1; i < nameIdx + 4 && i < lines.length; i++) {
+                        let line = lines[i];
+                        if (line.match(/^\(.*\)$/)) continue; // skip (He/Him)
+                        if (!title) {
+                            title = line;
+                            break;
+                        }
+                    }
+                }
+                
+                // Find Company (via explicit links to company/school pages in the top card)
+                // This completely bypasses class-name obfuscation
+                const companyLinks = topCard ? topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]') : [];
+                for (let link of companyLinks) {
+                    let text = link.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
+                    // Make sure it's not empty and not just an icon label
+                    if (text && text.length > 2 && text !== name && text !== title) {
+                        company = text;
                         break;
                     }
                 }
-
-                // Fallback for Title
+                
+                // Fallbacks
                 if (!title) {
                     let docTitle = document.title.replace(' | LinkedIn', '');
                     let parts = docTitle.split(' - ');
                     if (parts.length >= 2) title = parts[1].trim();
                 }
                 
-                // 2.5 Define the Top Card safely
-                // This guarantees we NEVER scrape the Highlights or sidebar by mistake!
-                let topCard = document.querySelector('.pv-top-card') || document.querySelector('.ph5.pb5');
-                if (!topCard) {
-                    const h1 = document.querySelector('h1');
-                    if (h1) topCard = h1.closest('section') || h1.parentElement.parentElement.parentElement;
-                }
-                // If we absolutely cannot find the top card wrapper, we create a dummy element to prevent global scraping
-                if (!topCard) topCard = document.createElement('div');
-
-                // 3. Company Extraction (Optimized for modern UI cards)
-                // Strategy: Only look strictly inside the topCard for links to companies/schools, or edit buttons.
-                const companyEls = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"], button[aria-label*="company" i], button[aria-label*="education" i]');
-                for (let el of companyEls) {
-                    // Extract text carefully to avoid invisible spans
-                    let text = el.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
-                    if (text && text.length > 2 && text !== name && text !== title) {
-                        company = text;
-                        break;
-                    }
-                }
-
-                // Fallback 1: Extract from Title string text splitting 
-                if (!company && title) {
-                    if (title.toLowerCase().includes(' at ')) {
-                        const parts = title.split(/\sat\s/i);
-                        company = parts[parts.length - 1].trim();
-                    } else if (title.includes(' - ')) {
-                        const parts = title.split(' - ');
-                        if (parts.length > 1) {
-                            company = parts[1].split(',')[0].trim();
-                        }
-                    }
+                if (!company && title.toLowerCase().includes(' at ')) {
+                    company = title.split(/\sat\s/i)[1].trim();
                 }
                 
-                // Fallback 2: The Right Panel if no explicit links exist (Handles search URLs or unusual badges)
                 if (!company) {
-                    const rightPanel = topCard.querySelector('.pv-text-details__right-panel');
-                    if (rightPanel) {
-                        const items = rightPanel.querySelectorAll('li, button, a');
-                        for (let item of items) {
-                            let text = item.textContent.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0).pop();
-                            if (text && text.length > 2 && text !== name && text !== title) {
-                                company = text;
-                                break;
-                            }
-                        }
-                        
-                        // Ultimate fallback: Just grab the raw visible text of the right panel
-                        if (!company && rightPanel.innerText) {
-                            let text = rightPanel.innerText.trim().split('\n').map(s=>s.trim()).filter(s=>s.length>0)[0];
-                            if (text && text.length > 2 && text !== name && text !== title) {
-                                company = text;
-                            }
-                        }
+                    const expSection = document.querySelector('#experience')?.closest('section');
+                    if (expSection) {
+                        const spans = expSection.querySelectorAll('span[aria-hidden="true"]');
+                        if (spans.length >= 2) company = spans[1].textContent.trim();
+                        else if (spans.length >= 1) company = spans[0].textContent.trim();
                     }
                 }
 
-                // 4. Location Extraction
-                const locSelectors = [
-                    '.pv-text-details__left-panel .text-body-small.inline',
-                    '.top-card-layout__first-subline .top-card__subline-item',
-                    'span.text-body-small.inline.break-words'
-                ];
-                for (let sel of locSelectors) {
-                    const el = document.querySelector(sel);
-                    if (el && el.textContent.trim().length > 0) {
-                        location = el.textContent.trim();
-                        break;
-                    }
-                }
+                // Find Location
+                const locEl = topCard.querySelector('.pb2 .text-body-small, .text-body-small');
+                if (locEl) location = locEl.textContent.trim();
 
                 return { name, title, company, location };
             };
@@ -128,18 +84,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 type: 'person',
                 name: data.name,
                 title: data.title,
-                company: data.company || 'Not found', 
-                location: data.location || 'Not found'
+                company: data.company, 
+                location: data.location
             });
         } else {
-            // Company Website Scrape Logic (Executes on external company domains)
-            let companyName = document.title;
-            if (companyName.includes('-')) {
-                companyName = companyName.split('-')[0].trim();
-            } else if (companyName.includes('|')) {
-                companyName = companyName.split('|')[0].trim();
-            }
-            
+            // Company Website
+            let companyName = document.title.split('-')[0].split('|')[0].trim();
             let domain = window.location.hostname.replace('www.', '');
             sendResponse({
                 type: 'company',
