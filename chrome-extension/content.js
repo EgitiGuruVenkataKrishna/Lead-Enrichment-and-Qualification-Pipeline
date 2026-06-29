@@ -95,7 +95,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
 
                 // Find Location
-                const locEl = topCard.querySelector('.pb2 .text-body-small, .text-body-small');
+                const mainCard = document.querySelector('.pv-top-card') || document.querySelector('section.artdeco-card') || document.body;
+                const locEl = mainCard.querySelector('.pb2 .text-body-small, .text-body-small');
                 if (locEl) location = locEl.textContent.trim();
 
                 return { name, title, company, location };
