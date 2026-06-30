@@ -160,8 +160,13 @@ async function pollStatus(leadId) {
 
                 // Drafts
                 let draftsGenerated = 'No';
-                if (lead.outreach_drafts && (lead.outreach_drafts.direct || lead.outreach_drafts.consultative)) {
-                    draftsGenerated = 'Yes ✓';
+                if (lead.outreach_drafts) {
+                    if (typeof lead.outreach_drafts === 'string' && lead.outreach_drafts.trim().length > 0) {
+                        draftsGenerated = 'Yes ✓';
+                    } else if (typeof lead.outreach_drafts === 'object' && 
+                               (lead.outreach_drafts.direct || lead.outreach_drafts.consultative || lead.outreach_drafts.social_proof)) {
+                        draftsGenerated = 'Yes ✓';
+                    }
                 }
                 document.getElementById('res-drafts').textContent = draftsGenerated;
             }
