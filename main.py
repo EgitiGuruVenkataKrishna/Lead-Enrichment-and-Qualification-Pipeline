@@ -73,6 +73,24 @@ def pipeline_worker():
 worker_thread = threading.Thread(target=pipeline_worker, daemon=True)
 worker_thread.start()
 
+def sync_worker():
+    """Background thread that pulls updates from Airtable periodically."""
+    # Wait 30 seconds after startup before starting periodic sync
+    time.sleep(30)
+    while True:
+        db = SessionLocal()
+        try:
+            crm_sync.sync_airtable_to_local_db(db)
+        except Exception as e:
+            print(f"Background sync error: {e}")
+        finally:
+            db.close()
+        time.sleep(60)
+
+# Start the sync worker thread
+sync_thread = threading.Thread(target=sync_worker, daemon=True)
+sync_thread.start()
+
 app = FastAPI(title="Lead Enrichment Pipeline")
 
 @app.on_event("startup")

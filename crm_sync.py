@@ -207,10 +207,36 @@ def sync_airtable_to_local_db(db: Session) -> None:
                 db.add(new_lead)
                 synced_count += 1
             else:
-                # Update existing (if needed, though mostly for startup population)
-                existing.pipeline_status = fields.get("pipeline_status", "enriched")
+                # Update existing lead with all enriched fields from Airtable
+                existing.pipeline_status = fields.get("pipeline_status", existing.pipeline_status)
                 if fields.get("icp_score"):
                     existing.icp_score = int(fields.get("icp_score"))
+                
+                # Update other enriched fields if present in Airtable
+                if "company_size" in fields:
+                    existing.company_size = fields["company_size"]
+                if "tech_stack" in fields:
+                    existing.tech_stack = fields["tech_stack"]
+                if "funding_status" in fields:
+                    existing.funding_status = fields["funding_status"]
+                if "industry" in fields:
+                    existing.industry = fields["industry"]
+                if "sub_industry" in fields:
+                    existing.sub_industry = fields["sub_industry"]
+                if "role" in fields:
+                    existing.role = fields["role"]
+                if "seniority" in fields:
+                    existing.seniority = fields["seniority"]
+                if "recent_news" in fields:
+                    existing.recent_news = fields["recent_news"]
+                if "confidence_scores" in fields:
+                    existing.confidence_scores = safe_json_loads(fields["confidence_scores"])
+                if "buying_signals" in fields:
+                    existing.buying_signals = safe_json_loads(fields["buying_signals"])
+                if "icp_reasoning" in fields:
+                    existing.icp_reasoning = safe_json_loads(fields["icp_reasoning"])
+                if "outreach_drafts" in fields:
+                    existing.outreach_drafts = safe_json_loads(fields["outreach_drafts"])
                 
         db.commit()
         print(f"Successfully synced {synced_count} leads from Airtable to local DB.")
