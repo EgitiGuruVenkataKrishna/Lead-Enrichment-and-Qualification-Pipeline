@@ -94,7 +94,7 @@ function extractFromSalesNavigatorDiv(div) {
         }
     }
     
-    return { name, title, company, location };
+    return { name: cleanName(name), title, company, location };
 }
 
 function extractLinkedInProfile() {
@@ -211,7 +211,7 @@ function extractLinkedInProfile() {
         }
     }
 
-    return { name, title, company, location };
+    return { name: cleanName(name), title, company, location };
 }
 
 /**
@@ -454,6 +454,19 @@ function extractCompanyWebsite() {
 // ════════════════════════════════════════════════════════
 //  Utility
 // ════════════════════════════════════════════════════════
+
+/**
+ * Cleans a name from common LinkedIn badges, connection levels, and pronouns.
+ */
+function cleanName(name) {
+    if (!name) return "";
+    return name
+        .replace(/\s*(?:he|she|they)\s*\/\s*(?:him|her|them)\b/i, '')
+        .replace(/\s*[\(（](?:he|she|they)\s*\/\s*(?:him|her|them)[\)）]/i, '')
+        .replace(/\s*\b\d+(?:st|nd|rd|th)\b/gi, '')
+        .replace(/[\s·•|]+$/g, '')
+        .trim();
+}
 
 /**
  * Tries a list of CSS selectors in order, returns the first non-empty text match.
