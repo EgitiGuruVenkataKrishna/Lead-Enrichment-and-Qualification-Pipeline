@@ -123,7 +123,23 @@ News: {truncated_news}
             return validated.model_dump()
         except Exception as ve:
             print(f"Validation error on LLM extraction output: {ve}")
-            return json_data # Fallback to raw if validation strictly fails
+            # Ensure safe fallback structure if validation strictly fails
+            safe_data = {}
+            for field in schemas.EnrichedProfileOutput.model_fields:
+                safe_data[field] = json_data.get(field) if isinstance(json_data, dict) else None
+            
+            if not isinstance(safe_data.get("confidence_scores"), dict):
+                safe_data["confidence_scores"] = {
+                    "company_size": "medium",
+                    "tech_stack": "medium",
+                    "funding_status": "medium",
+                    "industry": "medium",
+                    "sub_industry": "medium",
+                    "role": "medium",
+                    "seniority": "medium",
+                    "recent_news": "medium"
+                }
+            return safe_data
             
     except Exception as e:
         print(f"Error during LLM extraction: {e}")
