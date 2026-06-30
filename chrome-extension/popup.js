@@ -1,5 +1,5 @@
 // popup.js
-const API_URL = 'https://lead-enrichment-and-qualification-pipeline-production.up.railway.app';
+const API_URL = 'https://web-production-1f7a6.up.railway.app';
 
 document.addEventListener('DOMContentLoaded', () => {
 
