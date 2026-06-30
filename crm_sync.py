@@ -175,10 +175,13 @@ def sync_airtable_to_local_db(db: Session) -> None:
             from sqlalchemy import or_
             existing = query.filter(or_(*conditions)).first()
             
-            # Helper to parse json strings safely
             def safe_json_loads(val):
                 if not val: return None
-                try: return json.loads(val)
+                try: 
+                    parsed = json.loads(val)
+                    if isinstance(parsed, (dict, list)):
+                        return parsed
+                    return None
                 except: return None
                 
             if not existing:
