@@ -55,7 +55,7 @@ def sync_lead_to_airtable(lead) -> str:
         fields["buying_signals"] = json.dumps(lead.buying_signals)
     if lead.icp_reasoning is not None:
         fields["icp_reasoning"] = json.dumps(lead.icp_reasoning)
-    if lead.outreach_drafts is not None:
+    if lead.outreach_drafts:
         fields["outreach_drafts"] = json.dumps(lead.outreach_drafts)
 
     # Ensure all values in the fields dictionary are strings before sending

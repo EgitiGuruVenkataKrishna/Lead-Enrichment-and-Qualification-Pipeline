@@ -83,10 +83,24 @@ def generate_dynamic_mock_profile(website_text: str, news_text: str) -> dict:
         role = "CTO"
     elif "ceo" in text:
         role = "CEO"
+    elif "cmo" in text:
+        role = "CMO"
+    elif "cfo" in text:
+        role = "CFO"
+    elif "coo" in text:
+        role = "COO"
+    elif "cro" in text:
+        role = "CRO"
     elif "co-founder" in text:
         role = "Co-founder"
     elif "founder" in text:
         role = "Founder"
+    elif "vp" in text:
+        role = "VP"
+    elif "director" in text:
+        role = "Director"
+    elif "manager" in text:
+        role = "Manager"
     elif "product manager" in text:
         role = "Product Manager"
     elif "designer" in text or "ux" in text:
@@ -249,19 +263,22 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
     min_sen = (icp_config.get("minimum_seniority") or "").lower()
     lead_sen = (lead_data.get("seniority") or "").lower()
     
-    hierarchy = ["intern", "junior", "mid-level", "senior", "director", "c-level"]
-    try:
-        min_idx = hierarchy.index(min_sen) if min_sen in hierarchy else 2  # default mid-level
-        lead_idx = hierarchy.index(lead_sen) if lead_sen in hierarchy else 2
-        if lead_idx >= min_idx:
-            score += 15
-            reasons.append(f"Role seniority ({lead_data.get('seniority')}) meets or exceeds required level ({icp_config.get('minimum_seniority')})")
-        else:
-            reasons.append(f"Seniority ({lead_data.get('seniority')}) is below required level ({icp_config.get('minimum_seniority')})")
-    except Exception:
-        if min_sen in lead_sen or lead_sen in min_sen:
-            score += 15
-            reasons.append(f"Role seniority ({lead_data.get('seniority')}) matches requirements")
+    if min_sen:
+        hierarchy = ["intern", "junior", "mid-level", "senior", "director", "c-level"]
+        try:
+            min_idx = hierarchy.index(min_sen) if min_sen in hierarchy else 2  # default mid-level
+            lead_idx = hierarchy.index(lead_sen) if lead_sen in hierarchy else 2
+            if lead_idx >= min_idx:
+                score += 15
+                reasons.append(f"Role seniority ({lead_data.get('seniority')}) meets or exceeds required level ({icp_config.get('minimum_seniority')})")
+            else:
+                reasons.append(f"Seniority ({lead_data.get('seniority')}) is below required level ({icp_config.get('minimum_seniority')})")
+        except Exception:
+            if min_sen in lead_sen or lead_sen in min_sen:
+                score += 15
+                reasons.append(f"Role seniority ({lead_data.get('seniority')}) matches requirements")
+    else:
+        reasons.append(f"Role seniority is {lead_data.get('seniority')}")
             
     # 5. Key Decision Maker Boost (Founder / Co-founder / CEO / CTO / President / C-Level)
     role_lower = (lead_data.get("role") or "").lower()
@@ -384,15 +401,9 @@ Reply JSON with keys:
 def generate_outreach_drafts(lead_data: dict, product_value_prop: str, num_variants: int = 3) -> dict:
     llm_inst = get_llm_instance()
     if llm_inst is None:
-        # Return mock drafts if LLM is disabled/unavailable
-        name = lead_data.get("original_name") or "there"
-        company = lead_data.get("original_company") or "your company"
-        role = lead_data.get("role") or "your role"
-        return {
-            "direct": f"Hi {name},\n\nI saw your work at {company} as a {role}. Let's connect to talk about {product_value_prop}.",
-            "consultative": f"Hello {name},\n\nHope this finds you well. As a {role} at {company}, you're likely managing dynamic challenges. Let's discuss how {product_value_prop} can support your goals.",
-            "social_proof": f"Hi {name},\n\nWe helped similar teams improve. Let's discuss how {product_value_prop} can help {company}."
-        }
+        # Return empty dict in mock mode so we don't generate/overwrite placeholders.
+        # This allows the drafts column in Airtable (real drafts) to sync cleanly.
+        return {}
 
     if lead_data.get("icp_score", 0) < 50:
         return {"direct": "", "consultative": "", "social_proof": ""}
