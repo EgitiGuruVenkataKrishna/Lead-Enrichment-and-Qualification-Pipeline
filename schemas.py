@@ -40,10 +40,13 @@ class LeadResponse(BaseModel):
     pipeline_status: str
     crm_sync_status: str
 
-    # Day 2 ICP Fields
+    # ICP Scoring Fields
     icp_score: Optional[int] = None
     buying_signals: Optional[List[str]] = None
     icp_reasoning: Optional[Any] = None
+
+    # Outreach Drafts — without this the frontend detail view cannot display drafts
+    outreach_drafts: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,6 +56,7 @@ class ICPConfigCreate(BaseModel):
     required_tech_stack: Optional[str] = None
     minimum_seniority: Optional[str] = None
     disqualifying_signals: Optional[str] = None
+    product_value_proposition: Optional[str] = None
 
 class ICPConfigResponse(BaseModel):
     id: int
@@ -61,6 +65,7 @@ class ICPConfigResponse(BaseModel):
     required_tech_stack: Optional[str] = None
     minimum_seniority: Optional[str] = None
     disqualifying_signals: Optional[str] = None
+    product_value_proposition: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -100,4 +105,3 @@ class PipelineStatusResponse(BaseModel):
     original_name: Optional[str] = None
     original_company: Optional[str] = None
     pipeline_status: str
-

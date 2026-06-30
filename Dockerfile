@@ -14,9 +14,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Download a memory-friendly micro-model for Railway free tier (~398MB)
-RUN wget -O model.gguf https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf
-
+# Download Qwen2.5-0.5B-Instruct Q4_0 (~428 MB)
+# This is the smallest instruct-tuned model that can do structured JSON extraction.
+# Q4_0 chosen over Q4_K_M (491 MB) for extra RAM headroom on Railway's 512 MB limit.
+# Peak RAM ~420 MB with use_mmap + n_ctx=512, fits within Railway free tier.
+RUN wget -q --show-progress -O model.gguf \
+    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_0.gguf"
 
 # Make the entrypoint script executable
 RUN chmod +x entrypoint.sh

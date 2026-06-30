@@ -133,24 +133,28 @@
                     <div class="card">
                         <form id="icp-form">
                             <div class="form-group">
-                                <label>Target Company Size</label>
+                                <label>Target Company Size <span class="hint">How many employees your ideal customer has</span></label>
                                 <input type="text" id="icp-size" placeholder="e.g. 50-200 employees">
                             </div>
                             <div class="form-group">
-                                <label>Target Industries</label>
+                                <label>Target Industries <span class="hint">Comma-separated list of industries to target</span></label>
                                 <input type="text" id="icp-industries" placeholder="e.g. B2B SaaS, Fintech">
                             </div>
                             <div class="form-group">
-                                <label>Required Tech Stack</label>
+                                <label>Required Tech Stack <span class="hint">Technologies your product integrates with</span></label>
                                 <input type="text" id="icp-tech" placeholder="e.g. React, AWS">
                             </div>
                             <div class="form-group">
-                                <label>Minimum Seniority</label>
+                                <label>Minimum Seniority <span class="hint">The lowest acceptable seniority for the contact</span></label>
                                 <input type="text" id="icp-seniority" placeholder="e.g. VP or C-Level">
                             </div>
                             <div class="form-group">
-                                <label>Disqualifying Signals</label>
+                                <label>Disqualifying Signals <span class="hint">Leads matching these will be scored lower</span></label>
                                 <input type="text" id="icp-disqualify" placeholder="e.g. Agencies, Competitors">
+                            </div>
+                            <div class="form-group">
+                                <label>Product Value Proposition <span class="hint">Your product pitch — used to generate personalised outreach drafts</span></label>
+                                <textarea id="icp-value-prop" rows="3" placeholder="e.g. An AI-powered lead enrichment pipeline that saves sales teams 10 hours per week." style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;"></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary mt-2">Save Configuration</button>
                         </form>

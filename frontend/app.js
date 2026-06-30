@@ -62,13 +62,24 @@ async function fetchLeads() {
             const tr = document.createElement('tr');
             tr.onclick = () => showLeadDetail(lead.id);
             
-            const scoreStr = lead.icp_score !== null ? `${lead.icp_score}/100` : '-';
+            // Build ICP score progress bar
+            let scoreCell = '-';
+            if (lead.icp_score !== null && lead.icp_score !== undefined) {
+                const score = lead.icp_score;
+                const scoreClass = score >= 60 ? 'score-high' : score >= 30 ? 'score-medium' : 'score-low';
+                scoreCell = `
+                    <div class="score-bar-container">
+                        <div class="score-bar"><div class="score-bar-fill ${scoreClass}" style="width:${score}%"></div></div>
+                        <span class="score-text ${scoreClass}">${score}</span>
+                    </div>`;
+            }
+            
             const signalStr = (lead.buying_signals && lead.buying_signals.length > 0) ? lead.buying_signals[0] : '-';
             
             tr.innerHTML = `
                 <td>${lead.original_name || '-'}</td>
                 <td>${lead.original_company || '-'}</td>
-                <td>${scoreStr}</td>
+                <td>${scoreCell}</td>
                 <td><small>${signalStr.substring(0, 50)}${signalStr.length > 50 ? '...' : ''}</small></td>
                 <td><span class="badge ${getBadgeClass(lead.pipeline_status)}">${lead.pipeline_status}</span></td>
                 <td>${lead.crm_sync_status}</td>
@@ -284,6 +295,7 @@ async function fetchIcpConfig() {
             document.getElementById('icp-tech').value = config.required_tech_stack || '';
             document.getElementById('icp-seniority').value = config.minimum_seniority || '';
             document.getElementById('icp-disqualify').value = config.disqualifying_signals || '';
+            document.getElementById('icp-value-prop').value = config.product_value_proposition || '';
         }
     } catch (e) {
         console.error(e);
@@ -297,7 +309,8 @@ document.getElementById('icp-form').addEventListener('submit', async (e) => {
         target_industries: document.getElementById('icp-industries').value,
         required_tech_stack: document.getElementById('icp-tech').value,
         minimum_seniority: document.getElementById('icp-seniority').value,
-        disqualifying_signals: document.getElementById('icp-disqualify').value
+        disqualifying_signals: document.getElementById('icp-disqualify').value,
+        product_value_proposition: document.getElementById('icp-value-prop').value
     };
     
     try {
@@ -318,7 +331,8 @@ document.getElementById('btn-preview-score').addEventListener('click', async () 
         target_industries: document.getElementById('icp-industries').value,
         required_tech_stack: document.getElementById('icp-tech').value,
         minimum_seniority: document.getElementById('icp-seniority').value,
-        disqualifying_signals: document.getElementById('icp-disqualify').value
+        disqualifying_signals: document.getElementById('icp-disqualify').value,
+        product_value_proposition: document.getElementById('icp-value-prop').value
     };
     
     const btn = document.getElementById('btn-preview-score');

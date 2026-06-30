@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn Resilient Scraper",
+  "name": "LeadQ - Lead Enrichment",
   "version": "1.0",
-  "permissions": ["activeTab"],
+  "description": "Enrich leads from LinkedIn profiles and company websites with one click.",
+  "permissions": ["activeTab", "scripting"],
   "action": { "default_popup": "popup.html" },
   "content_scripts": [
-  {
-    "matches": ["*://*.linkedin.com/*"],
-    "js": ["content.js"]
-  }
- ]
+    {
+      "matches": ["*://*.linkedin.com/*"],
+      "js": ["content.js"]
+    }
+  ]
 }

@@ -2,31 +2,51 @@
 <html>
 <head>
     <style>
-        body { width: 300px; padding: 15px; font-family: -apple-system, sans-serif; }
+        body { width: 320px; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fafafa; }
         .hidden { display: none; }
-        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        h3 { margin-top: 0; color: #1f2937; display: flex; align-items: center; gap: 8px; }
+        h3 span { color: #4f46e5; }
+
+        .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: 600; font-size: 13px; margin-top: 10px; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
         .btn-primary { background: #4f46e5; color: white; }
         .btn-success { background: #10b981; color: white; }
+
         .input-group { margin-bottom: 10px; }
-        .input-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #4b5563; }
-        .input-group input { width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
-        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin: 10px auto; }
+        .input-group label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-group input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 13px; }
+        .input-group input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1); }
+
+        .spinner { border: 3px solid #e5e7eb; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; margin: 16px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .result-box { background: #f9fafb; padding: 10px; border: 1px solid #e5e7eb; border-radius: 4px; margin-top: 15px; font-size: 13px; }
+
+        .result-box { background: white; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 12px; font-size: 13px; }
+        .result-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { color: #6b7280; font-weight: 500; }
+        .result-value { font-weight: 600; color: #1f2937; }
+
+        .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .status-success { background: #d1fae5; color: #047857; }
+        .status-failed { background: #fee2e2; color: #b91c1c; }
+
+        .error-text { color: #ef4444; font-size: 12px; margin-top: 8px; padding: 8px; background: #fef2f2; border-radius: 6px; }
     </style>
 </head>
 <body>
-    <h3 style="margin-top:0;">LeadQ Enrichment</h3>
+    <h3><span>⚡</span> LeadQ Enrichment</h3>
     <button id="fetchBtn" class="btn btn-primary">Extract from Page</button>
-    
-    <div id="form-container" class="hidden" style="margin-top: 15px;">
+
+    <div id="error-msg" class="error-text hidden"></div>
+
+    <div id="form-container" class="hidden" style="margin-top: 12px;">
         <div class="input-group">
             <label>Name</label>
-            <input type="text" id="name" placeholder="Lead Name">
+            <input type="text" id="name" placeholder="Lead name">
         </div>
         <div class="input-group">
             <label>Company</label>
-            <input type="text" id="company" placeholder="Company Name">
+            <input type="text" id="company" placeholder="Company name">
         </div>
         <div class="input-group">
             <label>Domain</label>
@@ -35,16 +55,28 @@
         <button id="sendBtn" class="btn btn-success">Enrich Lead</button>
     </div>
 
-    <div id="loading" class="hidden text-center">
+    <div id="loading" class="hidden" style="text-align: center;">
         <div class="spinner"></div>
-        <p style="text-align: center; font-size: 13px; color: #6b7280;">Enriching...</p>
+        <p style="font-size: 12px; color: #6b7280;">Enriching lead...</p>
     </div>
 
     <div id="result-container" class="hidden result-box">
-        <p><strong>Status:</strong> <span id="res-status"></span></p>
-        <p><strong>ICP Score:</strong> <span id="res-score"></span></p>
-        <p><strong>Top Signal:</strong> <span id="res-signal"></span></p>
-        <p><strong>Drafts:</strong> <span id="res-drafts"></span></p>
+        <div class="result-row">
+            <span class="result-label">Status</span>
+            <span id="res-status" class="status-badge"></span>
+        </div>
+        <div class="result-row">
+            <span class="result-label">ICP Score</span>
+            <span id="res-score" class="result-value"></span>
+        </div>
+        <div class="result-row">
+            <span class="result-label">Top Signal</span>
+            <span id="res-signal" class="result-value" style="font-size: 12px; max-width: 180px; text-align: right;"></span>
+        </div>
+        <div class="result-row">
+            <span class="result-label">Drafts Generated</span>
+            <span id="res-drafts" class="result-value"></span>
+        </div>
     </div>
 
     <script src="popup.js"></script>

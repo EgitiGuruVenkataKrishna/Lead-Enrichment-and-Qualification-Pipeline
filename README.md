@@ -20,12 +20,60 @@ The pipeline implements a weighted formula to calculate the final ICP score, com
 - **Signal Strength Score**: A derived score up to 100 based on the number and quality of detected buying signals (e.g., funding, hiring).
 - **Adjustability**: The weights are controlled via environment variables (`ICP_FIT_WEIGHT` and `BUYING_SIGNAL_WEIGHT`). They can be adjusted dynamically at runtime without requiring any code changes or redeployments. 
 
-## 3. Model & Memory Constraints
+## 3. Model Choices & Memory Footprint
 
-To maintain low operational costs and high privacy, the system utilizes a **local CPU-bound LLM** (provided in `.gguf` format).
+### Model Selection
 
-- **Resource Profile**: The selected model is highly quantized, designed to maintain a memory footprint of approximately **<4 GB RAM** during active inference.
-- **Railway Compatibility**: Because of this constrained memory footprint, the pipeline fits securely within Railway's free tier memory limits, preventing out-of-memory (OOM) crashes and avoiding expensive tier upgrades. 
+| Property | Value |
+|---|---|
+| **Model** | Qwen2.5-0.5B-Instruct |
+| **Quantization** | Q4_0 (4-bit) |
+| **File size** | ~428 MB |
+| **Source** | [HuggingFace](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF) |
+| **Prompt format** | ChatML (`<\|im_start\|>` / `<\|im_end\|>`) |
+
+### Why This Model
+
+Railway's free tier provides **512 MB RAM**. This is the binding constraint. We evaluated several models:
+
+| Model | Disk Size | Peak RAM | Fits 512 MB? |
+|---|---|---|---|
+| Qwen3.5-2B Q4_K_M | ~1.4 GB | ~1.8 GB | ❌ OOM |
+| Qwen2.5-1.5B Q4_K_M | ~1.0 GB | ~1.2 GB | ❌ OOM |
+| Qwen2.5-0.5B Q4_K_M | ~491 MB | ~480 MB | ⚠️ Too tight |
+| **Qwen2.5-0.5B Q4_0** | **~428 MB** | **~420 MB** | **✅** |
+| SmolLM-135M Q8 | ~150 MB | ~200 MB | ✅ but too low quality |
+
+Qwen2.5-0.5B-Instruct is the **largest instruction-tuned model** that fits within Railway's memory limit while still producing usable structured JSON output for lead extraction, ICP scoring, and outreach generation.
+
+### Memory Budget
+
+| Component | Estimated RAM |
+|---|---|
+| Python + FastAPI + SQLAlchemy | ~80 MB |
+| llama-cpp-python runtime | ~20 MB |
+| Qwen2.5-0.5B Q4_0 model (mmap'd) | ~300 MB active |
+| KV-cache (n_ctx=512) | ~10 MB |
+| **Total Peak** | **~410 MB** |
+| **Railway Limit** | **512 MB** |
+| **Headroom** | **~100 MB** |
+
+### Memory Optimization Techniques
+
+- **`use_mmap=True`**: Memory-maps the model file so the OS can page unused portions to disk.
+- **`use_mlock=False`**: Allows the OS to swap model pages under memory pressure.
+- **`n_ctx=512`**: Minimal context window reduces KV-cache allocation.
+- **`n_threads=1`**: Single inference thread minimises per-thread stack overhead.
+- **Aggressive prompt truncation**: Website text capped at 1200 chars, news at 400 chars.
+- **Lazy singleton**: Model loaded on first request, not at import time.
+
+### Known Quality Trade-offs
+
+A 0.5B parameter model is small. Expect:
+- Occasional JSON parsing failures (handled gracefully with fallback mock data).
+- Less nuanced semantic reasoning for ICP scoring compared to larger models.
+- Shorter, less polished outreach drafts.
+- The system logs all LLM failures and never crashes — it degrades to mock data.
 
 ## 4. Scraping Approach & Graceful Degradation
 
@@ -40,21 +88,23 @@ The pipeline avoids unstable, expensive APIs in favor of direct DOM-based scrapi
 This repository is tailored for easy deployment on [Railway](https://railway.app/) using Docker.
 
 1. **Prepare the Repository**: Ensure your code is pushed to a GitHub repository.
-2. **Model Hosting**: The `Dockerfile` has been configured to automatically download a lightweight micro-model (`Qwen1.5-0.5B-Chat-GGUF`, ~398MB) during the build step. This completely avoids the need to mount volumes or upload 4GB files, and fits safely within Railway's 500MB Hobby tier limits.
+2. **Model Hosting**: The `Dockerfile` automatically downloads `qwen2.5-0.5b-instruct-q4_0.gguf` (~428 MB) during the build step. No volume mounts or manual uploads needed.
 3. **Connect to Railway**:
    - Go to the Railway dashboard, select **New Project** > **Deploy from GitHub repo**.
    - Select your lead-enrichment repository.
 4. **Environment Variables**:
    In the Railway dashboard, navigate to the **Variables** tab for your service and configure:
    ```env
+   USE_LOCAL_LLM=true
    AIRTABLE_API_KEY=your_api_key
    AIRTABLE_BASE_ID=your_base_id
    AIRTABLE_TABLE_NAME=Leads
-   USE_LOCAL_LLM=true
    ICP_FIT_WEIGHT=0.7
    BUYING_SIGNAL_WEIGHT=0.3
    ```
 5. **Build and Deploy**: Railway will automatically detect the `Dockerfile` and begin the build. The frontend will be served directly from the root `/` endpoint, and the APIs from `/api`.
+
+> **Important**: Set `USE_LOCAL_LLM=true` in Railway's Variables tab. The `.env` file is gitignored and won't be available in the deployed container.
 
 ## 6. UI & Chrome Extension
 
