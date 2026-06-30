@@ -45,23 +45,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function extractLinkedInProfile() {
     let name = "", title = "", company = "", location = "";
 
-    // ── 1. Parse document.title (MOST STABLE) ──
-    // Format: "Name - Title - Company | LinkedIn"  OR  "Name - Title | LinkedIn"
-    const rawTitle = document.title.replace(/\s*\|\s*LinkedIn\s*$/i, '').trim();
-    const titleParts = rawTitle.split(' - ').map(s => s.trim());
-
-    if (titleParts.length >= 1) {
-        name = titleParts[0];
-    }
-    if (titleParts.length >= 2) {
-        title = titleParts[1];
-    }
-    if (titleParts.length >= 3) {
-        // Join remaining parts in case company name itself contains " - "
-        company = titleParts.slice(2).join(' - ');
-    }
-
-    // ── 2. Refine name from DOM (more accurate than title tag) ──
+    // ── 1. Refine name from DOM ──
     const nameFromDom = extractText([
         'h1.text-heading-xlarge',
         '.text-heading-xlarge',
@@ -72,33 +56,42 @@ function extractLinkedInProfile() {
         name = nameFromDom.split('\n')[0].trim();
     }
 
-    // ── 3. Get headline from DOM ──
-    // The headline is displayed right below the name (e.g., "CTO at Acme Corp")
+    // ── 2. Get headline (title) from DOM ──
     const headlineFromDom = extractText([
         'div.text-body-medium.break-words',
         '.pv-top-card--list .text-body-medium',
         '.top-card-layout__headline'
     ]);
     if (headlineFromDom) {
-        const cleanHeadline = headlineFromDom.split('\n')[0].trim();
-        // If title from document.title was empty or generic, use DOM headline
-        if (!title || title.length < 3) {
-            title = cleanHeadline;
-        }
+        title = headlineFromDom.split('\n')[0].trim();
     }
 
-    // ── 4. Extract company (multiple fallbacks) ──
-    if (!company) {
-        company = extractCompanyFromProfile(name, title);
-    }
-
-    // ── 5. Parse company from headline "at" pattern ──
-    // e.g. "Senior Engineer at Google" or "CTO @ Startup Inc"
-    if (!company && title) {
+    // ── 3. Extract company from headline "at" / "@" pattern ──
+    // e.g. "Senior Engineer at Google" or "Gen AI Intern @Dotsquares | ..."
+    if (title) {
         const atMatch = title.match(/\b(?:at|@)\s+(.+?)(?:\s*[|·•]|$)/i);
         if (atMatch) {
             company = atMatch[1].trim();
         }
+    }
+
+    // ── 4. Extract company from DOM links if not in headline ──
+    if (!company) {
+        company = extractCompanyFromProfile(name, title);
+    }
+
+    // ── 5. Fallback: Parse document.title ──
+    const rawTitle = document.title.replace(/\s*\|\s*LinkedIn\s*$/i, '').trim();
+    const titleParts = rawTitle.split(' - ').map(s => s.trim());
+    
+    if (!name && titleParts.length >= 1) {
+        name = titleParts[0];
+    }
+    if (!title && titleParts.length >= 2) {
+        title = titleParts[1];
+    }
+    if (!company && titleParts.length >= 3) {
+        company = titleParts.slice(2).join(' - ');
     }
 
     // ── 6. Extract location ──
