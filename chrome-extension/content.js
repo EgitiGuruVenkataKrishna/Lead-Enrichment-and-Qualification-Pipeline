@@ -57,14 +57,45 @@ function extractLinkedInProfile() {
     }
 
     // ── 2. Get headline (title) from DOM ──
-    const headlineFromDom = extractText([
-        '.text-body-medium',
-        '.pv-text-details__left-panel > div',
-        '.pv-text-details__left-panel [class*="text-body"]',
-        '.text-body-medium.break-words',
-        '.pv-top-card--list .text-body-medium',
-        '.top-card-layout__headline'
-    ]);
+    let headlineFromDom = "";
+    const nameEl = document.querySelector('h1.text-heading-xlarge') || 
+                   document.querySelector('.text-heading-xlarge') ||
+                   document.querySelector('h1');
+    if (nameEl) {
+        const leftPanel = nameEl.closest('.pv-text-details__left-panel') || 
+                          nameEl.closest('div') ||
+                          nameEl.parentElement?.parentElement;
+        if (leftPanel) {
+            const possibleHeadlines = leftPanel.querySelectorAll('.text-body-medium, [class*="headline"], [class*="text-body"], div, span, h2');
+            for (const el of possibleHeadlines) {
+                const text = el.textContent.trim();
+                if (text && text.length > 10 && text.length < 200 && 
+                    text !== name && 
+                    !text.includes('connection') && 
+                    !text.includes('mutual') &&
+                    !text.toLowerCase().includes('contact info') &&
+                    !text.toLowerCase().includes('he/him') &&
+                    !text.toLowerCase().includes('she/her') &&
+                    !text.toLowerCase().includes('they/them')) {
+                    headlineFromDom = text;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Fallback if relative DOM traversal failed
+    if (!headlineFromDom) {
+        headlineFromDom = extractText([
+            '.text-body-medium',
+            '.pv-text-details__left-panel > div',
+            '.pv-text-details__left-panel [class*="text-body"]',
+            '.text-body-medium.break-words',
+            '.pv-top-card--list .text-body-medium',
+            '.top-card-layout__headline'
+        ]);
+    }
+    
     if (headlineFromDom) {
         title = headlineFromDom.split('\n')[0].trim();
     }
