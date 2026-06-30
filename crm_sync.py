@@ -3,6 +3,8 @@ import requests
 import urllib.parse
 import json
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+import models
 
 load_dotenv()
 
@@ -133,3 +135,81 @@ def sync_lead_to_airtable(lead) -> str:
     except Exception as e:
         print(f"Error syncing lead {lead.id} to Airtable: {e}")
         return "failed"
+
+def sync_airtable_to_local_db(db: Session) -> None:
+    """
+    Fetch all records from Airtable and insert/update them in the local SQLite DB.
+    This provides persistence across ephemeral container restarts (e.g. on Railway).
+    """
+    if not AIRTABLE_API_KEY or not AIRTABLE_BASE_ID or not AIRTABLE_TABLE_NAME:
+        print("Airtable sync skipped: Missing credentials.")
+        return
+
+    base_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE_NAME}"
+    headers = {
+        "Authorization": f"Bearer {AIRTABLE_API_KEY}"
+    }
+
+    try:
+        response = requests.get(base_url, headers=headers, timeout=15)
+        response.raise_for_status()
+        records = response.json().get("records", [])
+        
+        synced_count = 0
+        for record in records:
+            fields = record.get("fields", {})
+            email_domain = fields.get("email_domain")
+            original_company = fields.get("original_company")
+            
+            if not email_domain and not original_company:
+                continue
+                
+            # Find existing lead by domain or company
+            query = db.query(models.Lead)
+            conditions = []
+            if email_domain:
+                conditions.append(models.Lead.email_domain == email_domain)
+            if original_company:
+                conditions.append(models.Lead.original_company == original_company)
+                
+            from sqlalchemy import or_
+            existing = query.filter(or_(*conditions)).first()
+            
+            # Helper to parse json strings safely
+            def safe_json_loads(val):
+                if not val: return None
+                try: return json.loads(val)
+                except: return None
+                
+            if not existing:
+                new_lead = models.Lead(
+                    original_name=fields.get("original_name"),
+                    original_company=original_company,
+                    email_domain=email_domain,
+                    company_size=fields.get("company_size"),
+                    tech_stack=fields.get("tech_stack"),
+                    funding_status=fields.get("funding_status"),
+                    industry=fields.get("industry"),
+                    sub_industry=fields.get("sub_industry"),
+                    role=fields.get("role"),
+                    seniority=fields.get("seniority"),
+                    recent_news=fields.get("recent_news"),
+                    pipeline_status=fields.get("pipeline_status", "enriched"),
+                    icp_score=int(fields.get("icp_score", 0)) if fields.get("icp_score") else None,
+                    confidence_scores=safe_json_loads(fields.get("confidence_scores")),
+                    buying_signals=safe_json_loads(fields.get("buying_signals")),
+                    icp_reasoning=safe_json_loads(fields.get("icp_reasoning")),
+                    outreach_drafts=safe_json_loads(fields.get("outreach_drafts"))
+                )
+                db.add(new_lead)
+                synced_count += 1
+            else:
+                # Update existing (if needed, though mostly for startup population)
+                existing.pipeline_status = fields.get("pipeline_status", "enriched")
+                if fields.get("icp_score"):
+                    existing.icp_score = int(fields.get("icp_score"))
+                
+        db.commit()
+        print(f"Successfully synced {synced_count} leads from Airtable to local DB.")
+    except Exception as e:
+        print(f"Failed to sync Airtable to local DB: {e}")

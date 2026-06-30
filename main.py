@@ -1,9 +1,12 @@
 import csv
 from typing import Generator
-from fastapi import FastAPI, UploadFile, File, Depends, BackgroundTasks, HTTPException
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import threading
+import queue
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,6 +18,7 @@ from pydantic import ValidationError
 import models
 import schemas
 import pipeline
+import crm_sync
 
 DATABASE_URL = "sqlite:///./leads.db"
 
@@ -46,7 +50,41 @@ def seed_initial_config() -> None:
 # Run seed configuration
 seed_initial_config()
 
+# Background Worker Queue for Sequential Processing
+lead_queue = queue.Queue()
+
+def pipeline_worker():
+    """Background thread worker that processes one lead at a time."""
+    while True:
+        lead_id = lead_queue.get()
+        if lead_id is None:
+            break
+        print(f"Worker picked up lead {lead_id} from queue...")
+        db = SessionLocal()
+        try:
+            pipeline.process_lead(lead_id, db)
+        except Exception as e:
+            print(f"Pipeline worker error for lead {lead_id}: {e}")
+        finally:
+            db.close()
+            lead_queue.task_done()
+
+# Start the worker thread
+worker_thread = threading.Thread(target=pipeline_worker, daemon=True)
+worker_thread.start()
+
 app = FastAPI(title="Lead Enrichment Pipeline")
+
+@app.on_event("startup")
+def startup_event():
+    """Trigger Airtable pull on startup to populate SQLite and prevent data loss on Railway restart."""
+    db = SessionLocal()
+    try:
+        crm_sync.sync_airtable_to_local_db(db)
+    except Exception as e:
+        print(f"Startup Airtable sync failed: {e}")
+    finally:
+        db.close()
 
 # CORS Middleware to support the Chrome Extension
 app.add_middleware(
@@ -68,12 +106,7 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-def run_pipeline_bg(lead_id: int) -> None:
-    db = SessionLocal()
-    try:
-        pipeline.process_lead(lead_id, db)
-    finally:
-        db.close()
+
 
 def decode_utf8_lines(file) -> Generator[str, None, None]:
     for line in file:
@@ -82,7 +115,6 @@ def decode_utf8_lines(file) -> Generator[str, None, None]:
 @app.post("/api/leads/upload")
 async def upload_leads(
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
     total_rows_processed = 0
@@ -140,9 +172,8 @@ async def upload_leads(
         
         # Extract IDs and enqueue background tasks
         lead_ids = [lead.id for lead in valid_leads]
-        if background_tasks:
-            for lead_id in lead_ids:
-                background_tasks.add_task(run_pipeline_bg, lead_id)
+        for lead_id in lead_ids:
+            lead_queue.put(lead_id)
 
     return {
         "total_rows_processed": total_rows_processed,
@@ -153,7 +184,6 @@ async def upload_leads(
 @app.post("/api/leads/single")
 async def create_single_lead(
     lead_in: schemas.LeadCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     lead = models.Lead(
@@ -165,7 +195,7 @@ async def create_single_lead(
     db.commit()
     db.refresh(lead)
 
-    background_tasks.add_task(run_pipeline_bg, lead.id)
+    lead_queue.put(lead.id)
 
     return {
         "message": "Lead queued",

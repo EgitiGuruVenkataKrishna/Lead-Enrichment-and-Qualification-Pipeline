@@ -36,7 +36,7 @@ def get_llm_instance():
             _llm_instance = Llama(
                 model_path="model.gguf",
                 n_ctx=512,        # Minimal context window to save KV-cache RAM
-                n_threads=1,      # Single thread for constrained environments
+                n_threads=2,      # 2 threads for optimized CPU execution on Railway
                 n_gpu_layers=0,   # CPU only — no GPU on Railway
                 use_mmap=True,    # Memory-map the model file to reduce resident RAM
                 use_mlock=False,  # Don't lock model in RAM — let OS page as needed
