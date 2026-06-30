@@ -170,7 +170,7 @@ async function pollStatus(leadId) {
         }
     }, 2000);
 
-    // Stop polling after 2 minutes to prevent infinite loops
+    // Stop polling after 5 minutes to prevent infinite loops
     setTimeout(() => {
         clearInterval(interval);
         const loading = document.getElementById('loading');
@@ -179,5 +179,5 @@ async function pollStatus(leadId) {
             showError('Enrichment is taking longer than expected. Check the web dashboard for results.');
             document.getElementById('form-container').classList.remove('hidden');
         }
-    }, 120000);
+    }, 300000);
 }
