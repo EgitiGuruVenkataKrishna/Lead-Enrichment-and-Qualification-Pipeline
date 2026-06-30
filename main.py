@@ -238,7 +238,13 @@ async def get_lead(lead_id: int, db: Session = Depends(get_db)):
     lead = db.query(models.Lead).filter(models.Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    return lead
+    
+    # Inject Airtable URL
+    base_id = os.getenv("AIRTABLE_BASE_ID")
+    lead_res = schemas.LeadResponse.model_validate(lead)
+    if base_id:
+        lead_res.airtable_url = f"https://airtable.com/{base_id}"
+    return lead_res
 
 @app.get("/api/leads", response_model=list[schemas.LeadResponse])
 async def get_all_leads(db: Session = Depends(get_db)):

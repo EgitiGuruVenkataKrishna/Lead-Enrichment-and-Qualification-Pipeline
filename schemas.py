@@ -46,7 +46,8 @@ class LeadResponse(BaseModel):
     icp_reasoning: Optional[Any] = None
 
     # Outreach Drafts — without this the frontend detail view cannot display drafts
-    outreach_drafts: Optional[dict] = None
+    outreach_drafts: Optional[Any] = None
+    airtable_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

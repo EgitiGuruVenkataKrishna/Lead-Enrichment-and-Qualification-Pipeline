@@ -135,21 +135,47 @@ async function showLeadDetail(leadId) {
         const draftsDiv = document.getElementById('detail-drafts');
         draftsDiv.innerHTML = '';
         
-        if (lead.outreach_drafts && typeof lead.outreach_drafts === 'object') {
-            for (const [tone, draft] of Object.entries(lead.outreach_drafts)) {
-                if(!draft) continue;
+        if (lead.airtable_url) {
+            const linkBox = document.createElement('div');
+            linkBox.style.marginBottom = '15px';
+            linkBox.innerHTML = `
+                <a href="${lead.airtable_url}" target="_blank" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Airtable
+                </a>
+            `;
+            draftsDiv.appendChild(linkBox);
+        }
+        
+        if (lead.outreach_drafts) {
+            if (typeof lead.outreach_drafts === 'string') {
                 const box = document.createElement('div');
                 box.className = 'draft-box';
                 box.innerHTML = `
                     <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                        <strong>${tone.charAt(0).toUpperCase() + tone.slice(1)} Variant</strong>
-                        <button class="btn btn-secondary btn-copy" data-draft="${encodeURIComponent(draft)}">
+                        <strong>Outreach Draft</strong>
+                        <button class="btn btn-secondary btn-copy" data-draft="${encodeURIComponent(lead.outreach_drafts)}">
                             <i class="fa-regular fa-copy"></i> Copy
                         </button>
                     </div>
-                    <pre>${draft}</pre>
+                    <pre>${lead.outreach_drafts}</pre>
                 `;
                 draftsDiv.appendChild(box);
+            } else if (typeof lead.outreach_drafts === 'object') {
+                for (const [tone, draft] of Object.entries(lead.outreach_drafts)) {
+                    if(!draft) continue;
+                    const box = document.createElement('div');
+                    box.className = 'draft-box';
+                    box.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <strong>${tone.charAt(0).toUpperCase() + tone.slice(1)} Variant</strong>
+                            <button class="btn btn-secondary btn-copy" data-draft="${encodeURIComponent(draft)}">
+                                <i class="fa-regular fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        <pre>${draft}</pre>
+                    `;
+                    draftsDiv.appendChild(box);
+                }
             }
             
             // Add copy listeners
@@ -162,7 +188,7 @@ async function showLeadDetail(leadId) {
                 });
             });
         } else {
-            draftsDiv.innerHTML = '<p class="text-muted">Drafts not generated yet. Lead might be enriching or failed ICP qualification.</p>';
+            draftsDiv.innerHTML += '<p class="text-muted">Drafts not generated yet. Lead might be enriching or failed ICP qualification.</p>';
         }
         
         switchView('detail-view');
