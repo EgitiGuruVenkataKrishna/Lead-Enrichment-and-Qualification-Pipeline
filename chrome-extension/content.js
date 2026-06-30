@@ -42,8 +42,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 //  LinkedIn Personal Profile Extraction
 // ════════════════════════════════════════════════════════
 
+function getElementByXpath(xpath) {
+    try {
+        const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        return result.singleNodeValue;
+    } catch (e) {
+        return null;
+    }
+}
+
+function extractFromSalesNavigatorDiv(div) {
+    let name = "", title = "", company = "", location = "";
+    
+    // Try explicit Sales Navigator classes first if available
+    const nameEl = div.querySelector('h1') || div.querySelector('[class*="name"]') || div.querySelector('[class*="title"]');
+    if (nameEl) name = nameEl.textContent.trim();
+    
+    const headlineEl = div.querySelector('[class*="headline"]') || div.querySelector('[data-anonymized-type="headline"]');
+    if (headlineEl) title = headlineEl.textContent.trim();
+    
+    const locEl = div.querySelector('[class*="location"]') || div.querySelector('[class*="place"]') || div.querySelector('[class*="geographic"]');
+    if (locEl) location = locEl.textContent.trim();
+
+    // Fallback: iterate over all children to extract
+    const children = div.querySelectorAll('span, div, h1, h2, p, a');
+    for (const el of children) {
+        const text = el.textContent.trim();
+        if (!text || text.length < 2) continue;
+        
+        // Extract Name
+        if (!name && text.length < 50 && !text.includes(' at ') && !text.includes('@') && !text.includes(',')) {
+            name = text;
+            continue;
+        }
+        // Extract Headline
+        if (!title && (text.includes(' at ') || text.includes('@')) && text.length < 150) {
+            title = text;
+            continue;
+        }
+        // Extract Location
+        if (!location && text.includes(',') && text.length < 100 && text !== name && text !== title) {
+            location = text;
+        }
+    }
+    
+    // Parse company from title
+    if (title) {
+        const atMatch = title.match(/(?:\bat\b|@)\s*(.+?)(?:\s*[|·•]|$)/i);
+        if (atMatch) {
+            company = atMatch[1].trim();
+        }
+    }
+    
+    return { name, title, company, location };
+}
+
 function extractLinkedInProfile() {
     let name = "", title = "", company = "", location = "";
+
+    // ── 0. Sales Navigator Fallback ──
+    const salesNavDiv = getElementByXpath('//*[@id="workspace"]/div/div/section/div/div/div[1]/div/section/div/div/div[2]/div[1]/div[1]/div') ||
+                        document.querySelector('.profile-topcard-person-details') ||
+                        document.querySelector('[class*="profile-topcard-person-details"]');
+    if (salesNavDiv) {
+        const data = extractFromSalesNavigatorDiv(salesNavDiv);
+        if (data.name || data.title) {
+            return data;
+        }
+    }
 
     // ── 1. Refine name from DOM ──
     const nameFromDom = extractText([
