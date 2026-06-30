@@ -175,14 +175,19 @@ def sync_airtable_to_local_db(db: Session) -> None:
             from sqlalchemy import or_
             existing = query.filter(or_(*conditions)).first()
             
-            def safe_json_loads(val):
+            def safe_json_loads(val, allow_string=False):
                 if not val: return None
                 try: 
                     parsed = json.loads(val)
                     if isinstance(parsed, (dict, list)):
                         return parsed
-                    return None
-                except: return None
+                    if allow_string and isinstance(parsed, str):
+                        return parsed
+                except: 
+                    pass
+                if allow_string:
+                    return val
+                return None
                 
             if not existing:
                 new_lead = models.Lead(
@@ -202,7 +207,7 @@ def sync_airtable_to_local_db(db: Session) -> None:
                     confidence_scores=safe_json_loads(fields.get("confidence_scores")),
                     buying_signals=safe_json_loads(fields.get("buying_signals")),
                     icp_reasoning=safe_json_loads(fields.get("icp_reasoning")),
-                    outreach_drafts=safe_json_loads(fields.get("outreach_drafts"))
+                    outreach_drafts=safe_json_loads(fields.get("outreach_drafts"), allow_string=True)
                 )
                 db.add(new_lead)
                 synced_count += 1
@@ -236,7 +241,7 @@ def sync_airtable_to_local_db(db: Session) -> None:
                 if "icp_reasoning" in fields:
                     existing.icp_reasoning = safe_json_loads(fields["icp_reasoning"])
                 if "outreach_drafts" in fields:
-                    existing.outreach_drafts = safe_json_loads(fields["outreach_drafts"])
+                    existing.outreach_drafts = safe_json_loads(fields["outreach_drafts"], allow_string=True)
                 
         db.commit()
         print(f"Successfully synced {synced_count} leads from Airtable to local DB.")
