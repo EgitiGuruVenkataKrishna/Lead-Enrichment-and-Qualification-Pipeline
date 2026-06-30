@@ -118,32 +118,47 @@ function extractLinkedInProfile() {
  * Attempts to extract the current company name from various DOM locations.
  */
 function extractCompanyFromProfile(name, title) {
-    // Strategy A: Look for company links in the top card area
-    // LinkedIn renders the current company as a clickable link to /company/ page
-    const topCard = document.querySelector('.pv-top-card') ||
-                    document.querySelector('section.artdeco-card') ||
-                    document.querySelector('main');
-    if (topCard) {
-        const companyLinks = topCard.querySelectorAll('a[href*="/company/"]');
-        for (const link of companyLinks) {
-            const text = link.textContent.trim().split('\n')[0].trim();
+    // Strategy A: Look for current company in the top card right panel (highest priority)
+    const rightPanel = document.querySelector('.pv-text-details__right-panel') ||
+                        document.querySelector('.pv-top-card--experience-list') ||
+                        document.querySelector('.scaffold-layout__right-panel');
+    if (rightPanel) {
+        const items = rightPanel.querySelectorAll('a, button, span');
+        for (const el of items) {
+            // Find the deepest text node or span
+            const span = el.querySelector('span[class*="-text"]') || el.querySelector('span') || el;
+            let text = span.textContent.trim().split('\n')[0].trim();
+            // Split by common separators like bullets
+            text = text.split(/[·•|]/)[0].trim();
             if (text && text.length > 1 && text.length < 100 &&
-                text !== name && !text.toLowerCase().includes('see all')) {
+                text !== name && text !== title &&
+                !text.toLowerCase().includes('mutual') && 
+                !text.toLowerCase().includes('you both') &&
+                !text.toLowerCase().includes('see all')) {
                 return text;
             }
         }
     }
 
-    // Strategy B: Look for the "current company" button/link in the top card right panel
-    const rightPanel = document.querySelector('.pv-text-details__right-panel');
-    if (rightPanel) {
-        const buttons = rightPanel.querySelectorAll('a, button, span');
-        for (const el of buttons) {
-            const text = el.textContent.trim().split('\n')[0].trim();
-            if (text && text.length > 1 && text.length < 100 &&
-                text !== name && text !== title &&
-                !text.includes('mutual') && !text.includes('You both')) {
-                return text;
+    // Strategy B: Look for company links ONLY in the top card area (avoid falling back to main)
+    const topCardSelectors = [
+        '.pv-top-card',
+        'section.artdeco-card:first-of-type',
+        '.scaffold-layout__top-card',
+        '.profile-topcard'
+    ];
+    for (const sel of topCardSelectors) {
+        const card = document.querySelector(sel);
+        if (card) {
+            const companyLinks = card.querySelectorAll('a[href*="/company/"]');
+            for (const link of companyLinks) {
+                const span = link.querySelector('span[class*="-text"]') || link.querySelector('span') || link;
+                let text = span.textContent.trim().split('\n')[0].trim();
+                text = text.split(/[·•|]/)[0].trim();
+                if (text && text.length > 1 && text.length < 100 &&
+                    text !== name && !text.toLowerCase().includes('see all')) {
+                    return text;
+                }
             }
         }
     }
@@ -153,13 +168,32 @@ function extractCompanyFromProfile(name, title) {
     if (expSection) {
         const section = expSection.closest('section') || expSection.parentElement;
         if (section) {
-            // Look for company name in aria-hidden spans (LinkedIn duplicates text for accessibility)
             const spans = section.querySelectorAll('span[aria-hidden="true"]');
             for (const span of spans) {
-                const text = span.textContent.trim();
-                // Skip duration strings like "3 yrs 2 mos", role titles, and the name itself
+                let text = span.textContent.trim();
+                
+                // If it contains a bullet, it's likely "Company Name · Employment Type"
+                if (text.includes('·') || text.includes('•')) {
+                    const parts = text.split(/[·•]/);
+                    const possibleCompany = parts[0].trim();
+                    const secondPart = parts[1].toLowerCase();
+                    // If second part looks like employment type, this is our company!
+                    if (secondPart.includes('full-time') || secondPart.includes('part-time') || 
+                        secondPart.includes('contract') || secondPart.includes('internship') || 
+                        secondPart.includes('apprenticeship') || secondPart.includes('freelance')) {
+                        return possibleCompany;
+                    }
+                }
+                
+                // General cleaning & filtering
+                text = text.split(/[·•|]/)[0].trim();
+                
+                // Skip duration strings, role titles, and common job words to avoid returning the role title
+                const jobWords = ['engineer', 'developer', 'manager', 'director', 'intern', 'analyst', 'specialist', 'consultant', 'lead', 'student', 'designer', 'architect', 'head', 'vice president', 'vp'];
+                const isJobTitle = jobWords.some(word => text.toLowerCase().includes(word));
+                
                 if (text && text.length > 1 && text.length < 80 &&
-                    text !== name && text !== title &&
+                    text !== name && text !== title && !isJobTitle &&
                     !/^\d/.test(text) &&
                     !text.includes(' mos') && !text.includes(' yrs') &&
                     !text.includes(' yr') && !text.includes(' mo') &&
