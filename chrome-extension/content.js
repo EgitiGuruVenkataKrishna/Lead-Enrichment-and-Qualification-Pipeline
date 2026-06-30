@@ -58,6 +58,9 @@ function extractLinkedInProfile() {
 
     // ── 2. Get headline (title) from DOM ──
     const headlineFromDom = extractText([
+        '.text-body-medium',
+        '.pv-text-details__left-panel > div',
+        '.pv-text-details__left-panel [class*="text-body"]',
         '.text-body-medium.break-words',
         '.pv-top-card--list .text-body-medium',
         '.top-card-layout__headline'
