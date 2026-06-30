@@ -63,30 +63,85 @@ def clean_llm_json(raw_output: str) -> dict:
         print(f"Error parsing LLM JSON: {e}")
     return {}
 
+def generate_dynamic_mock_profile(website_text: str, news_text: str) -> dict:
+    text = (website_text or "").lower()
+    
+    # 1. Determine seniority
+    seniority = "Mid-Level"
+    if any(w in text for w in ["senior", "sr."]):
+        seniority = "Senior"
+    elif any(w in text for w in ["director", "head", "vp", "chief", "cto", "ceo", "cfo"]):
+        seniority = "C-Level"
+    elif any(w in text for w in ["intern", "student", "co-op"]):
+        seniority = "Intern"
+    elif any(w in text for w in ["junior", "jr."]):
+        seniority = "Junior"
+        
+    # 2. Determine role
+    role = "Software Engineer"
+    if "product manager" in text:
+        role = "Product Manager"
+    elif "designer" in text or "ux" in text:
+        role = "Product Designer"
+    elif "sales" in text or "account executive" in text:
+        role = "Sales Executive"
+    elif "marketing" in text:
+        role = "Marketing Manager"
+    elif "data scientist" in text or "data analyst" in text:
+        role = "Data Scientist"
+        
+    # 3. Determine tech stack
+    techs = []
+    for t in ["React", "Python", "AWS", "Docker", "Kubernetes", "TypeScript", "Node.js", "Java", "Go", "Ruby"]:
+        if t.lower() in text:
+            techs.append(t)
+    if not techs:
+        techs = ["React", "Python", "AWS"] if len(text) % 2 == 0 else ["Node.js", "PostgreSQL", "GCP"]
+    tech_stack = ", ".join(techs)
+    
+    # 4. Determine company size
+    sizes = ["1-10 employees", "11-50 employees", "51-200 employees", "201-500 employees", "501-1000 employees", "1000+ employees"]
+    size_idx = len(text) % len(sizes)
+    company_size = sizes[size_idx]
+    
+    # 5. Determine industry
+    industries = ["B2B SaaS", "E-commerce", "Fintech", "Healthcare Tech", "Edtech", "AI & Machine Learning"]
+    ind_idx = (len(text) + 3) % len(industries)
+    industry = industries[ind_idx]
+    
+    # 6. Funding status
+    funding_list = ["Bootstrapped", "Seed", "Series A", "Series B", "Public"]
+    fund_idx = (len(text) + 7) % len(funding_list)
+    funding_status = funding_list[fund_idx]
+    
+    confidence_scores = {
+        "company_size": "medium" if len(text) % 3 == 0 else "high",
+        "tech_stack": "high" if len(techs) > 2 else "medium",
+        "funding_status": "medium",
+        "industry": "high",
+        "sub_industry": "medium",
+        "role": "high",
+        "seniority": "high",
+        "recent_news": "low" if not news_text else "high"
+    }
+    
+    return {
+        "company_size": company_size,
+        "tech_stack": tech_stack,
+        "funding_status": funding_status,
+        "industry": industry,
+        "sub_industry": f"Custom {industry} Solutions",
+        "role": role,
+        "seniority": seniority,
+        "recent_news": news_text[:100] + "..." if news_text else "Company expanded operations recently",
+        "confidence_scores": confidence_scores
+    }
+
 def extract_structured_data(website_text: str, news_text: str) -> dict:
     llm_inst = get_llm_instance()
     if llm_inst is None:
         # Return mock structured data if LLM is disabled/unavailable
-        return {
-            "company_size": "50-100 employees",
-            "tech_stack": "React, Python, AWS",
-            "funding_status": "Series A",
-            "industry": "B2B SaaS",
-            "sub_industry": "Developer Tools",
-            "role": "Software Engineer",
-            "seniority": "Senior",
-            "recent_news": "Recently launched product v2.0",
-            "confidence_scores": {
-                "company_size": "medium",
-                "tech_stack": "high",
-                "funding_status": "medium",
-                "industry": "high",
-                "sub_industry": "high",
-                "role": "high",
-                "seniority": "high",
-                "recent_news": "medium"
-            }
-        }
+        return generate_dynamic_mock_profile(website_text, news_text)
 
     # Aggressively truncate texts to fit within n_ctx=512
     truncated_website = website_text[:600] if website_text else ""
@@ -145,15 +200,83 @@ News: {truncated_news}
         print(f"Error during LLM extraction: {e}")
         return {}
 
+def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
+    score = 50
+    reasons = []
+    buying_signals = []
+    
+    target_ind = (icp_config.get("target_industries") or "").lower()
+    lead_ind = (lead_data.get("industry") or "").lower()
+    if target_ind and (target_ind in lead_ind or lead_ind in target_ind or any(w in lead_ind for w in target_ind.split())):
+        score += 20
+        reasons.append(f"Industry ({lead_data.get('industry')}) matches ICP targets")
+    else:
+        reasons.append(f"Industry ({lead_data.get('industry')}) is outside target ICP")
+        
+    target_size = (icp_config.get("target_company_size") or "").lower()
+    lead_size = (lead_data.get("company_size") or "").lower()
+    if target_size and any(w in lead_size for w in target_size.replace('-', ' ').split()):
+        score += 15
+        reasons.append(f"Company size ({lead_data.get('company_size')}) fits target range")
+    else:
+        score -= 5
+        
+    req_tech = (icp_config.get("required_tech_stack") or "").lower()
+    lead_tech = (lead_data.get("tech_stack") or "").lower()
+    matched_techs = []
+    if req_tech:
+        for w in req_tech.split(','):
+            w_clean = w.strip()
+            if w_clean and w_clean in lead_tech:
+                matched_techs.append(w_clean)
+        if matched_techs:
+            score += 15
+            reasons.append(f"Tech stack matches required technologies: {', '.join(matched_techs)}")
+            buying_signals.append(f"Using target tech stack (Source: website_text)")
+            
+    min_sen = (icp_config.get("minimum_seniority") or "").lower()
+    lead_sen = (lead_data.get("seniority") or "").lower()
+    if min_sen and (min_sen in lead_sen or lead_sen in min_sen):
+        score += 10
+        reasons.append(f"Role seniority ({lead_data.get('seniority')}) meets requirements")
+        
+    news = (lead_data.get("recent_news") or "").lower()
+    if news and any(w in news for w in ["launch", "expand", "hire", "growth", "funding"]):
+        score += 10
+        buying_signals.append("Active growth/news indicator (Source: recent_news)")
+        
+    score = min(max(score, 10), 100)
+    
+    icp_weight_str = os.getenv("ICP_FIT_WEIGHT", "0.7")
+    signal_weight_str = os.getenv("BUYING_SIGNAL_WEIGHT", "0.3")
+    try:
+        icp_weight = float(icp_weight_str)
+    except ValueError:
+        icp_weight = 0.7
+    try:
+        signal_weight = float(signal_weight_str)
+    except ValueError:
+        signal_weight = 0.3
+        
+    signal_strength = min(len(buying_signals) * 50, 100)
+    final_score = int((score * icp_weight) + (signal_strength * signal_weight))
+    final_score = min(max(final_score, 0), 100)
+    
+    reasoning = f"Mock evaluation summary: {', '.join(reasons)}."
+    if not buying_signals:
+        buying_signals = ["Digital footprint detected (Source: website_text)"]
+        
+    return {
+        "score": final_score,
+        "reasoning": reasoning,
+        "buying_signals": buying_signals
+    }
+
 def score_lead_against_icp(lead_data: dict, icp_config: dict) -> dict:
     llm_inst = get_llm_instance()
     if llm_inst is None:
         # Return mock score results if LLM is disabled/unavailable
-        return {
-            "score": 75,
-            "reasoning": "Mock evaluation: Lead matches target size and industry.",
-            "buying_signals": ["Recent website update (Source: website_text)", "Active hiring (Source: recent_news)"]
-        }
+        return calculate_dynamic_mock_score(lead_data, icp_config)
 
     # Build a compact lead summary to save tokens
     lead_summary = ", ".join(f"{k}: {v}" for k, v in lead_data.items() if v and k not in ("confidence_scores",))
