@@ -77,12 +77,24 @@ app = FastAPI(title="Lead Enrichment Pipeline")
 
 @app.on_event("startup")
 def startup_event():
-    """Trigger Airtable pull on startup to populate SQLite and prevent data loss on Railway restart."""
+    """Trigger Airtable pull on startup, recover stuck leads, and prevent data loss on Railway restart."""
     db = SessionLocal()
     try:
         crm_sync.sync_airtable_to_local_db(db)
+        
+        # Self-healing: Reset any stuck "enriching" leads back to "pending" and re-enqueue them
+        stuck_leads = db.query(models.Lead).filter(models.Lead.pipeline_status == "enriching").all()
+        if stuck_leads:
+            print(f"Startup: Found {len(stuck_leads)} leads stuck in 'enriching' status. Resetting and re-enqueuing...")
+            for lead in stuck_leads:
+                lead.pipeline_status = "pending"
+                db.add(lead)
+            db.commit()
+            
+            for lead in stuck_leads:
+                lead_queue.put(lead.id)
     except Exception as e:
-        print(f"Startup Airtable sync failed: {e}")
+        print(f"Startup tasks failed: {e}")
     finally:
         db.close()
 
