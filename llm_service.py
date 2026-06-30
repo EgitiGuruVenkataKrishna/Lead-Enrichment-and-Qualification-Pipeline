@@ -70,7 +70,7 @@ def generate_dynamic_mock_profile(website_text: str, news_text: str) -> dict:
     seniority = "Mid-Level"
     if any(w in text for w in ["senior", "sr."]):
         seniority = "Senior"
-    elif any(w in text for w in ["director", "head", "vp", "chief", "cto", "ceo", "cfo"]):
+    elif any(w in text for w in ["director", "head", "vp", "chief", "cto", "ceo", "cfo", "founder", "co-founder"]):
         seniority = "C-Level"
     elif any(w in text for w in ["intern", "student", "co-op"]):
         seniority = "Intern"
@@ -79,7 +79,15 @@ def generate_dynamic_mock_profile(website_text: str, news_text: str) -> dict:
         
     # 2. Determine role
     role = "Software Engineer"
-    if "product manager" in text:
+    if "cto" in text:
+        role = "CTO"
+    elif "ceo" in text:
+        role = "CEO"
+    elif "co-founder" in text:
+        role = "Co-founder"
+    elif "founder" in text:
+        role = "Founder"
+    elif "product manager" in text:
         role = "Product Manager"
     elif "designer" in text or "ux" in text:
         role = "Product Designer"
@@ -205,6 +213,7 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
     reasons = []
     buying_signals = []
     
+    # 1. Check industry fit
     target_ind = (icp_config.get("target_industries") or "").lower()
     lead_ind = (lead_data.get("industry") or "").lower()
     if target_ind and (target_ind in lead_ind or lead_ind in target_ind or any(w in lead_ind for w in target_ind.split())):
@@ -213,6 +222,7 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
     else:
         reasons.append(f"Industry ({lead_data.get('industry')}) is outside target ICP")
         
+    # 2. Check company size fit
     target_size = (icp_config.get("target_company_size") or "").lower()
     lead_size = (lead_data.get("company_size") or "").lower()
     if target_size and any(w in lead_size for w in target_size.replace('-', ' ').split()):
@@ -221,6 +231,7 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
     else:
         score -= 5
         
+    # 3. Check tech stack
     req_tech = (icp_config.get("required_tech_stack") or "").lower()
     lead_tech = (lead_data.get("tech_stack") or "").lower()
     matched_techs = []
@@ -234,12 +245,33 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
             reasons.append(f"Tech stack matches required technologies: {', '.join(matched_techs)}")
             buying_signals.append(f"Using target tech stack (Source: website_text)")
             
+    # 4. Check seniority (hierarchical comparison)
     min_sen = (icp_config.get("minimum_seniority") or "").lower()
     lead_sen = (lead_data.get("seniority") or "").lower()
-    if min_sen and (min_sen in lead_sen or lead_sen in min_sen):
-        score += 10
-        reasons.append(f"Role seniority ({lead_data.get('seniority')}) meets requirements")
-        
+    
+    hierarchy = ["intern", "junior", "mid-level", "senior", "director", "c-level"]
+    try:
+        min_idx = hierarchy.index(min_sen) if min_sen in hierarchy else 2  # default mid-level
+        lead_idx = hierarchy.index(lead_sen) if lead_sen in hierarchy else 2
+        if lead_idx >= min_idx:
+            score += 15
+            reasons.append(f"Role seniority ({lead_data.get('seniority')}) meets or exceeds required level ({icp_config.get('minimum_seniority')})")
+        else:
+            reasons.append(f"Seniority ({lead_data.get('seniority')}) is below required level ({icp_config.get('minimum_seniority')})")
+    except Exception:
+        if min_sen in lead_sen or lead_sen in min_sen:
+            score += 15
+            reasons.append(f"Role seniority ({lead_data.get('seniority')}) matches requirements")
+            
+    # 5. Key Decision Maker Boost (Founder / Co-founder / CEO / CTO / President / C-Level)
+    role_lower = (lead_data.get("role") or "").lower()
+    seniority_lower = (lead_data.get("seniority") or "").lower()
+    if any(w in role_lower or w in seniority_lower for w in ["ceo", "cto", "founder", "co-founder", "president", "c-level"]):
+        score += 25
+        reasons.append("Lead is a high-value key decision maker (CTO/CEO/Founder)")
+        buying_signals.append("Decision maker engagement (Source: title)")
+
+    # 6. Check for buying signals in recent news
     news = (lead_data.get("recent_news") or "").lower()
     if news and any(w in news for w in ["launch", "expand", "hire", "growth", "funding"]):
         score += 10
@@ -247,6 +279,7 @@ def calculate_dynamic_mock_score(lead_data: dict, icp_config: dict) -> dict:
         
     score = min(max(score, 10), 100)
     
+    # 7. Weighted combination
     icp_weight_str = os.getenv("ICP_FIT_WEIGHT", "0.7")
     signal_weight_str = os.getenv("BUYING_SIGNAL_WEIGHT", "0.3")
     try:
