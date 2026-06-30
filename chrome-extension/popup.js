@@ -99,8 +99,8 @@ function populateForm(response) {
         let company = response.company || '';
 
         // Extra fallback: try to parse company from title "XXX at Company"
-        if (!company && response.title && /\b(at|@)\s+/i.test(response.title)) {
-            company = response.title.split(/\s+(?:at|@)\s+/i).pop().trim();
+        if (!company && response.title && /(?:\bat\b|@)\s*/i.test(response.title)) {
+            company = response.title.split(/(?:\s+(?:at|@)\s+|\s*@\s*)/i).pop().trim();
         }
 
         // Guess domain from company if company exists

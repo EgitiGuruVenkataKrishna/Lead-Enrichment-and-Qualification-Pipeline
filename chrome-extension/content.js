@@ -72,7 +72,7 @@ function extractLinkedInProfile() {
     // ── 3. Extract company from headline "at" / "@" pattern ──
     // e.g. "Senior Engineer at Google" or "Gen AI Intern @Dotsquares | ..."
     if (title) {
-        const atMatch = title.match(/\b(?:at|@)\s+(.+?)(?:\s*[|·•]|$)/i);
+        const atMatch = title.match(/(?:\bat\b|@)\s*(.+?)(?:\s*[|·•]|$)/i);
         if (atMatch) {
             company = atMatch[1].trim();
         }
@@ -364,8 +364,8 @@ function extractCompanyWebsite() {
 function extractText(selectors) {
     for (const sel of selectors) {
         try {
-            const el = document.querySelector(sel);
-            if (el) {
+            const elements = document.querySelectorAll(sel);
+            for (const el of elements) {
                 const text = el.textContent.trim();
                 if (text.length > 0) return text;
             }
