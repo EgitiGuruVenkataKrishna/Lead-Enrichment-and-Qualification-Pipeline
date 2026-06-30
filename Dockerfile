@@ -24,5 +24,5 @@ RUN wget -q --show-progress -O model.gguf \
 # Make the entrypoint script executable
 RUN chmod +x entrypoint.sh
 
-# Launch via the script to guarantee shell expansion
-CMD ["./entrypoint.sh"]
+# Launch directly using shell expansion to prevent literal $PORT errors
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
