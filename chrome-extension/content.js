@@ -115,6 +115,29 @@ function extractLinkedInProfile() {
 }
 
 /**
+ * Helper to determine if an element is inside an ad container, right sidebar, or footer.
+ * Helps prevent false positives like extracting "Free Online Courses" as the company.
+ */
+function isElementInSidebarOrFooter(el) {
+    if (!el) return false;
+    let parent = el.parentElement;
+    while (parent) {
+        const className = parent.className || "";
+        const id = parent.id || "";
+        const tagName = parent.tagName.toLowerCase();
+        
+        if (tagName === 'aside' || tagName === 'footer' || 
+            className.includes('right-panel') || className.includes('sidebar') || 
+            className.includes('footer') || className.includes('ad-container') ||
+            id.includes('sidebar') || id.includes('footer')) {
+            return true;
+        }
+        parent = parent.parentElement;
+    }
+    return false;
+}
+
+/**
  * Dedicated helper to cleanly extract company text from a DOM element,
  * avoiding concatenated job titles and duration strings.
  */
@@ -190,13 +213,16 @@ function extractCompanyFromProfile(name, title) {
         'section.artdeco-card:first-of-type',
         '.scaffold-layout__top-card',
         '.profile-topcard',
-        'main' // Fallback to main since getCleanCompanyText will filter out bad links
+        'main' // Fallback to main but filtered by isElementInSidebarOrFooter below
     ];
     for (const sel of topCardSelectors) {
         const card = document.querySelector(sel);
         if (card) {
             const companyLinks = card.querySelectorAll('a[href*="/company/"]');
             for (const link of companyLinks) {
+                // Ignore any links inside sidebars or ads/footers (e.g. ad banners)
+                if (isElementInSidebarOrFooter(link)) continue;
+                
                 const text = getCleanCompanyText(link, name, title);
                 if (text) return text;
             }
