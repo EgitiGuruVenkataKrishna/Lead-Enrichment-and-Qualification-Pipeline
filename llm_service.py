@@ -400,10 +400,73 @@ Reply JSON with keys:
 
 def generate_outreach_drafts(lead_data: dict, product_value_prop: str, num_variants: int = 3) -> dict:
     llm_inst = get_llm_instance()
+    # Extract details
+    name = lead_data.get("original_name") or "there"
+    company = lead_data.get("original_company") or "your company"
+    role = lead_data.get("role") or "your role"
+    industry = lead_data.get("industry") or ""
+    tech_stack = lead_data.get("tech_stack") or ""
+    funding = lead_data.get("funding_status") or ""
+    
+    # Clean value prop ending punctuation
+    pv = (product_value_prop or "").strip()
+    if pv.endswith('.'):
+        pv = pv[:-1]
+        
     if llm_inst is None:
-        # Return empty dict in mock mode so we don't generate/overwrite placeholders.
-        # This allows the drafts column in Airtable (real drafts) to sync cleanly.
-        return {}
+        # Heuristic-based personalized draft generation
+        # Customize opening based on funding or tech
+        intro = f"Hi {name},"
+        
+        # Build Direct Variant
+        direct_body = ""
+        if funding and funding.lower() != "bootstrapped":
+            direct_body += f"Congrats on the recent {funding} round for {company}! "
+        elif tech_stack:
+            first_tech = tech_stack.split(',')[0].strip()
+            direct_body += f"I noticed that your team at {company} is building with {first_tech}. "
+        else:
+            direct_body += f"I saw your work at {company} as a {role}. "
+            
+        direct_body += f"I wanted to reach out because we help teams like yours with {pv[0].lower() + pv[1:] if len(pv) > 1 else pv}. "
+        
+        if "cto" in role.lower() or "tech" in role.lower():
+            direct_body += "I'd love to show you how we streamline engineering workflows. Let's connect next week?"
+        elif "cmo" in role.lower() or "marketing" in role.lower():
+            direct_body += "I'd love to share how we boost marketing lead conversion. Let's connect next week?"
+        else:
+            direct_body += "Would you be open to a quick 10-minute chat to share ideas?"
+            
+        # Build Consultative Variant
+        consultative_body = f"Hello {name},\n\nHope this finds you well. "
+        if "cto" in role.lower():
+            consultative_body += f"As a CTO, managing complex tech stacks at {company} comes with unique scaling challenges. "
+        elif "cmo" in role.lower():
+            consultative_body += f"As a CMO, keeping a steady flow of high-quality qualified pipeline at {company} is always top of mind. "
+        else:
+            consultative_body += f"Leading operations and strategy at {company} requires navigating a lot of moving parts. "
+            
+        if tech_stack:
+            consultative_body += f"With your stack utilizing {tech_stack}, integration and efficiency are key. "
+            
+        consultative_body += f"I wanted to see how you are currently tackling workflow optimization. We designed {pv} specifically to support teams in {industry or 'your space'}.\n\nLet's discuss if this could align with your goals this quarter."
+        
+        # Build Social Proof Variant
+        social_body = f"Hi {name},\n\n"
+        if industry:
+            social_body += f"We've been working closely with several growing companies in the {industry} space. "
+        else:
+            social_body += f"We've been working with teams similar to {company}. "
+            
+        social_body += f"Typically, we help them solve resource constraints by implementing {pv[0].lower() + pv[1:] if len(pv) > 1 else pv}.\n\n"
+        social_body += f"For example, teams using {tech_stack.split(',')[0] if tech_stack else 'similar stacks'} saw a 30% reduction in manual effort. "
+        social_body += f"Would you be open to hearing how we could do the same for {company}?"
+        
+        return {
+            "direct": f"Hi {name},\n\n" + direct_body,
+            "consultative": consultative_body,
+            "social_proof": social_body
+        }
 
     if lead_data.get("icp_score", 0) < 50:
         return {"direct": "", "consultative": "", "social_proof": ""}
