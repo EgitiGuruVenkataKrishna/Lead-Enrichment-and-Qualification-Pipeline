@@ -36,7 +36,7 @@ def get_llm_instance():
             _llm_instance = Llama(
                 model_path="model.gguf",
                 n_ctx=512,        # Minimal context window to save KV-cache RAM
-                n_threads=2,      # 2 threads for optimized CPU execution on Railway
+                n_threads=1,      # 1 thread to avoid core switching contention on shared Railway CPU
                 n_gpu_layers=0,   # CPU only — no GPU on Railway
                 use_mmap=True,    # Memory-map the model file to reduce resident RAM
                 use_mlock=False,  # Don't lock model in RAM — let OS page as needed
@@ -89,8 +89,8 @@ def extract_structured_data(website_text: str, news_text: str) -> dict:
         }
 
     # Aggressively truncate texts to fit within n_ctx=512
-    truncated_website = website_text[:1200] if website_text else ""
-    truncated_news = news_text[:400] if news_text else ""
+    truncated_website = website_text[:600] if website_text else ""
+    truncated_news = news_text[:200] if news_text else ""
 
     prompt = f"""<|im_start|>system
 You extract lead profile data as JSON.<|im_end|>
@@ -110,7 +110,7 @@ News: {truncated_news}
     try:
         response = llm_inst(
             prompt,
-            max_tokens=300,
+            max_tokens=150,
             temperature=0.1,
             stop=["<|im_end|>"]
         )
@@ -177,7 +177,7 @@ Reply JSON with keys:
     try:
         response = llm_inst(
             prompt,
-            max_tokens=300,
+            max_tokens=120,
             temperature=0.1,
             stop=["<|im_end|>"]
         )
@@ -277,7 +277,7 @@ Reply with ONLY a JSON object with keys:
     try:
         response = llm_inst(
             prompt,
-            max_tokens=500,
+            max_tokens=250,
             temperature=0.4,
             stop=["<|im_end|>"]
         )

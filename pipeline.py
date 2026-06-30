@@ -98,7 +98,8 @@ def process_lead(lead_id: int, db: Session) -> None:
                 
                 drafts = llm_service.generate_outreach_drafts(
                     lead_dict,
-                    icp_config.product_value_proposition
+                    icp_config.product_value_proposition,
+                    num_variants=2
                 )
                 if not drafts:
                     print("Outreach Generation step skipped (Local LLM disabled) - no outreach drafts returned")
